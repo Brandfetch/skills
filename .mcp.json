@@ -1,0 +1,6 @@
+{
+  "brandfetch": {
+    "type": "http",
+    "url": "https://mcp.brandfetch.io/mcp"
+  }
+}

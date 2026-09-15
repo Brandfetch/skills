@@ -1,0 +1,28 @@
+{
+  "name": "brandfetch",
+  "displayName": "Brandfetch",
+  "version": "1.0.0",
+  "description": "Brand data and assets for AI agents. Bundles the official Brandfetch MCP server (search 50M+ brands, get logos, colors, fonts, company data) with skills that turn it into finished deliverables: a client-personalized pitch deck from your own PPTX template, and a verified logo-wall slide.",
+  "author": {
+    "name": "Brandfetch",
+    "email": "support@brandfetch.com",
+    "url": "https://brandfetch.com"
+  },
+  "homepage": "https://docs.brandfetch.com/mcp/overview",
+  "repository": "https://github.com/Brandfetch/skills",
+  "license": "MIT",
+  "keywords": [
+    "brandfetch",
+    "brand",
+    "logo",
+    "logos",
+    "colors",
+    "fonts",
+    "company-data",
+    "pitch-deck",
+    "powerpoint",
+    "pptx",
+    "logo-wall",
+    "mcp"
+  ]
+}
