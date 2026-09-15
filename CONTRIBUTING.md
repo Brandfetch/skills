@@ -11,7 +11,8 @@
 3. Every skill must get its brand data from the Brandfetch MCP tools
    (`get_brand`, `brand_search`, …) and must never invent brand facts.
 4. Test locally: `claude --plugin-dir . ` then `/brandfetch:<skill-name>`.
-5. Run `claude plugin validate .` — it must print `Validation passed`.
+5. Run `claude plugin validate --strict .` — it must print `Validation passed`.
+   CI runs the same check, plus a frontmatter check, on every pull request.
 6. Add a line to `CHANGELOG.md`.
 
 ## Releasing

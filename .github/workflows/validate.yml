@@ -1,0 +1,54 @@
+name: Validate plugin
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Validate marketplace manifest
+        # Both manifests live in .claude-plugin/; the validator picks the
+        # marketplace one when it is present.
+        run: claude plugin validate --strict .
+
+      - name: Validate plugin manifest
+        # Re-run against a copy without marketplace.json so plugin.json,
+        # .mcp.json and skills/ are the ones checked.
+        run: |
+          tmp="$(mktemp -d)"
+          cp -R . "$tmp/plugin"
+          rm -f "$tmp/plugin/.claude-plugin/marketplace.json"
+          claude plugin validate --strict "$tmp/plugin"
+
+      - name: Check skill frontmatter
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          bad = []
+          for skill in sorted(pathlib.Path("skills").glob("*/SKILL.md")):
+              head = skill.read_text().split("---")
+              fm = head[1] if len(head) > 2 else ""
+              for key in ("name", "description"):
+                  if not re.search(rf"^{key}:\s*\S", fm, re.M):
+                      bad.append(f"{skill}: missing '{key}'")
+              name = re.search(r"^name:\s*(\S+)", fm, re.M)
+              if name and name.group(1) != skill.parent.name:
+                  bad.append(f"{skill}: name '{name.group(1)}' != folder '{skill.parent.name}'")
+          print("\n".join(bad) if bad else "frontmatter OK")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Byte-compile skill scripts
+        run: python3 -m compileall -q skills
