@@ -1,0 +1,27 @@
+{
+  "name": "brandfetch",
+  "owner": {
+    "name": "Brandfetch",
+    "email": "support@brandfetch.com",
+    "url": "https://brandfetch.com"
+  },
+  "metadata": {
+    "description": "Official Brandfetch plugins for Claude: the Brandfetch MCP server plus skills for on-brand deliverables.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "brandfetch",
+      "displayName": "Brandfetch",
+      "description": "Brand data and assets for AI agents. Bundles the official Brandfetch MCP server (search 50M+ brands, get logos, colors, fonts, company data) with skills that turn it into finished deliverables: a client-personalized pitch deck from your own PPTX template, and a verified logo-wall slide.",
+      "version": "1.0.0",
+      "source": "./",
+      "author": { "name": "Brandfetch", "url": "https://brandfetch.com" },
+      "homepage": "https://docs.brandfetch.com/mcp/overview",
+      "repository": "https://github.com/Brandfetch/skills",
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["brandfetch", "brand", "logo", "colors", "fonts", "pitch-deck", "pptx", "mcp"]
+    }
+  ]
+}
