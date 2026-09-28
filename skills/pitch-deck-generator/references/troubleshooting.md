@@ -22,6 +22,27 @@ variants often exist only as SVG or WebP. SVG → rasterise with `cairosvg`
 PowerPoint) and avoid embedding SVG (python-pptx and older Office handle it
 poorly).
 
+## Onboarding
+
+**Detect matched no logo, but the deck clearly has the client's.** The deck
+uses an older, recoloured or cropped logo — matching is by file or by image,
+and a rebrand defeats both. Look at `--extract` previews and set the
+picture's `token` by hand; the slot geometry is the same either way.
+
+**The client's name is proposed only as an "unsure" repeated name.** No
+`--brand` was passed, or the deck spells the name differently from the API
+(`Acme` vs `Acme Inc.`). Pass `--brand`, or add the deck's spelling as a
+`find` entry with `{bf:name}`.
+
+**Apply warns a `find` was not found.** The text is not a single paragraph's
+visible text — it spans two text boxes, or lives in a chart or SmartArt
+(neither is edited). Map each part separately, or retype it in the editor.
+
+**STILL MENTIONS THE PREVIOUS CLIENT after apply.** Speaker notes are
+tokenised but never filled by the builder, so rewrite them; a file title in
+`docProps/core.xml` or alt text on a picture you kept needs clearing by hand
+(or in the editor's File → Properties).
+
 ## Building
 
 **A token stayed unfilled.** In order of likelihood:
@@ -34,10 +55,14 @@ poorly).
    token interleaved with different formatting (half bold) will not merge.
    Retype it in one go in the editor.
 
-**A logo is invisible.** Theme/ground mismatch: a white (`theme=light`) mark
-on a light slide or vice versa. The scanner warns about this per slot. A
-coloured brand hides the mistake; test with a monochrome one (e.g. a brand
-whose mark is pure black/white).
+**A logo slot came out empty: "LEFT EMPTY: no variant visible".** Neither the
+light nor the dark variant stands out on that slot's ground — typically a
+brand that only publishes a white mark, on a light slide. Put the slot on a
+contrasting tile, or use `{bf:icon}` there (it carries its own background).
+
+**A logo is invisible anyway.** The builder measured the wrong ground: the
+colour under the slot comes from a gradient, picture or theme effect it
+cannot read (only solid fills are). Give the slot shape a solid fill.
 
 **A logo looks stretched or cropped wrong.** Check the slot frame: cover-fit
 is only for banners, icons and ellipses. A wordmark in a non-square rect gets

@@ -11,7 +11,7 @@ bundles two things:
 | Skill | What it does | Try |
 |---|---|---|
 | [`pitch-deck-generator`](skills/pitch-deck-generator/) | Fill **your own** PPTX template with a client's brand data and your deal values | *"Make a proposal deck for stripe.com"* |
-| [`logo-wall`](skills/logo-wall/) | A "trusted by" slide from a list of brands — grid derived, logos pixel-verified monochrome | *"Logo wall of our 12 customers, white on dark"* |
+| [`logo-wall`](skills/logo-wall/) | A "trusted by" wall as PPTX, PDF, HTML or PNG — logos pixel-verified, optically balanced, knockouts kept in monochrome | *"Logo wall of our 12 customers, white on dark"* |
 
 ![Deck cover example](docs/deck-example.jpg)
 ![Logo wall example](docs/wall-example.jpg)
@@ -60,7 +60,7 @@ Upload a skill folder via the [Skills API](https://platform.claude.com/docs/en/a
 - **`cdn.brandfetch.io`** on your environment's network allowlist — the skills
   download logo files with `curl`. Allowlist changes apply to **new**
   conversations only.
-- Python with `Pillow`; `python-pptx` for the logo wall.
+- Python with `Pillow`. Nothing else: PPTX and PDF files are written directly.
 
 Each skill's `references/setup.md` covers the setup traps in detail,
 including the three different failures that all look like a 403.
@@ -70,7 +70,7 @@ including the three different failures that all look like a 403.
 Both skills follow the same contract:
 
 - **Two token namespaces.** `{bf:*}` tokens resolve automatically from the
-  Brandfetch API (`{bf:name}`, `{bf:lightOrDarkLogo}`, …). Every other
+  Brandfetch API (`{bf:name}`, `{bf:logo}`, …). Every other
   `{token}` is yours — named after whatever your business sells, supplied at
   build time, **never guessed**.
 - **Never invent a fact.** Every value on a slide comes from the API or from
@@ -84,10 +84,16 @@ Both skills follow the same contract:
 ## Make it yours
 
 The deck skill is built to be forked. The bundled `assets/template.pptx` is a
-reference showing where tokens go — replace it with **your** deck:
+reference showing where tokens go — replace it with **your** deck.
+
+Attach your deck and say *set up my template*.
+
+Claude finds what changes per client in a deck you already sent — their name,
+logos, dates, fees — agrees the list with you, writes the template, and asks
+before it replaces the bundled one. Or instrument it by hand:
 
 1. Type tokens as visible text in your own template
-   (`{bf:name}`, `{bf:lightOrDarkLogo}`, `{your_own_fields}`).
+   (`{bf:name}`, `{bf:logo}`, `{your_own_fields}`).
 2. `python3 scripts/scan_template.py your-template.pptx` — fix every warning.
 3. Build. Nothing about your template's layout is hardcoded.
 

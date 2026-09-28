@@ -1,37 +1,43 @@
 #!/usr/bin/env python3
 """
-Build a logo-wall slide (editable PPTX) from a wall.json config.
+Build a logo wall — PPTX, PDF, HTML and/or PNG — from saved get_brand responses.
 
-    python3 build_wall.py wall.json out.pptx [--check]
-
---check downloads and pixel-verifies every brand's candidates and prints the
-confirm report WITHOUT building. Run it first, show the report to the user,
-build only after they confirm — flags are decisions for a human, not the tool.
+    python3 build_wall.py wall.json --check     # pick, verify, preview; build nothing
+    python3 build_wall.py wall.json             # build every format in "formats"
 
 wall.json:
 {
-  "title": "Trusted by teams everywhere",
-  "background": "dark",                  // "dark" | "light" | 6-digit hex
-  "mono": true,                          // require monochrome marks
-  "cols": null,                          // null = derived from brand count
+  "title": "Trusted by teams everywhere",      // optional
+  "background": "dark",                        // "dark" | "light" | "#RRGGBB"
+  "style": "mono",                             // "mono" | "color"
+  "type": "logo",                              // "logo" (wordmark) | "symbol"
+  "formats": ["pptx"],                         // any of pptx, pdf, html, png
+  "out": "logo-wall",                          // output basename
+  "cols": null,                                // null = derived
+  "ink": null,                                 // mono colour override, "#RRGGBB"
   "brands": [
-    { "name": "Slack",
-      "candidates": ["<primary src URL>", "<type:other fallback URL>", ...] }
+    "brands/stripe.json",                      // a get_brand response saved verbatim
+    {"brand": "brands/slack.json", "accept": true},   // decision on a flag
+    {"brand": "brands/figma.json", "drop": true},
+    {"brand": "brands/shopify.json", "name": "Shopify"}
   ]
 }
 
-Candidate URLs come from get_brand responses — the theme-matched primary
-first, then any same-theme variants under type "other". The script downloads
-candidates in order and keeps the FIRST one that passes the pixel check
-(when mono is requested). The `theme` label names the asset's own colour but
-does NOT guarantee monochrome: official light-theme variants often keep a
-coloured symbol, and the true all-white version, when it exists, may be
-filed under type "other" with no semantic label. Only pixels settle it.
+Which variant each brand gets is decided here, from pixels, never from the
+`theme` label alone (references/rules.md):
 
-This script never recolours a logo. A brand with no passing variant is
-FLAGGED, and the user chooses: accept the least-coloured candidate, switch
-that brand to its symbol, or drop it. Force-tinting a brand's mark is a
-brand-guideline violation, not a fallback.
+  mono   1. an official monochrome variant in the colour the ground needs
+         2. an official monochrome variant in the other colour, recoloured
+            (lossless: a one-colour mark stays the same drawing)
+         3. a colour variant flattened with the luminance threshold, knockouts
+            kept — FLAGGED for review when colour carries part of the drawing
+  color  the variant that is actually visible on the ground (≥50% of the
+         mark at ≥1.5:1), light marks first on dark grounds; none visible →
+         FLAGGED
+
+Every mono mark is re-rendered in one exact ink colour, so no wall mixes
+#FFFFFF with #F4F4F4. A flagged brand is not built until the wall.json entry
+says "accept": true or "drop": true — flags are human decisions.
 """
 import json
 import math
@@ -39,188 +45,226 @@ import os
 import re
 import subprocess
 import sys
-import warnings
 
-warnings.filterwarnings("ignore")
+import ink
+import layout as L
+import writers as W
 
-from PIL import Image
+DARK, LIGHT = "101012", "FAFAF8"
+RASTER_ORDER = ["png", "jpeg", "jpg", "webp", "svg"]
+REVIEW_LOSS = 0.08     # flattened marks whose colour carries ≥8% of their drawing
 
-DARK = "101012"
-LIGHT = "FAFAF8"
-SAT_THRESH = 0.15     # per-pixel saturation above this counts as coloured
-FRAC_THRESH = 0.02    # >2% coloured visible pixels = not monochrome
-CLAMP_HI = 1.25       # natural-height band around the median
-CLAMP_LO = 0.72
 
-SLIDE_W, SLIDE_H = 13.333, 7.5
-MARGIN, TOP, BOTTOM = 0.9, 1.4, 0.7
+def ground_hex(bg):
+    return DARK if bg == "dark" else LIGHT if bg == "light" else bg.lstrip("#").upper()
+
+
+def is_dark(hexval):
+    return ink._rel_lum(ink.hex_rgb(hexval)) < 0.18
 
 
 def fetch(url, dest):
+    """curl the src URL verbatim; the error text is kept for the report."""
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
-    subprocess.run(["curl", "-sS", "--fail", "-o", dest, url],
-                   check=True, capture_output=True)
+    r = subprocess.run(["curl", "-sS", "--fail", "-o", dest, url], capture_output=True, text=True)
+    if r.returncode:
+        msg = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else f"curl exit {r.returncode}"
+        if "403" in msg:
+            msg += " (see setup.md: allowlist, or a stale/edited ?c= credential)"
+        raise RuntimeError(msg)
     return dest
 
 
-def coloured_fraction(path):
-    """Fraction of visible pixels with meaningful saturation."""
-    im = Image.open(path).convert("RGBA")
-    im.thumbnail((200, 200))
-    visible = coloured = 0
-    for r, g, b, a in im.getdata():
-        if a <= 40:
+def candidates(brand, kind, workdir, slug):
+    """
+    Every logo entry that could be this brand's `kind` mark, downloaded and
+    profiled. Unlabelled `type: "other"` entries are included when their shape
+    matches — the true all-white variant often lives there.
+    """
+    out, errors = [], []
+    for i, e in enumerate(brand.get("logos") or []):
+        if e.get("type") not in (kind, "other"):
             continue
-        visible += 1
-        mx, mn = max(r, g, b), min(r, g, b)
-        if mx > 30 and (mx - mn) / mx > SAT_THRESH:
-            coloured += 1
-    return (coloured / visible) if visible else 0.0
-
-
-def ink_ratio(path):
-    """Aspect ratio of the tight ink bounding box (not the canvas)."""
-    im = Image.open(path).convert("RGBA")
-    bb = im.getbbox()
-    if not bb:
-        return 1.0
-    return (bb[2] - bb[0]) / max(1, bb[3] - bb[1])
-
-
-def resolve_brand(brand, workdir, want_mono):
-    """
-    Download candidates in order; return (path, flag_or_None).
-    Keeps the first mono pass when mono is requested, else the first candidate.
-    """
-    slug = re.sub(r"[^a-z0-9]+", "-", brand["name"].lower()).strip("-")
-    best, best_frac = None, 1.0
-    for i, url in enumerate(brand["candidates"]):
-        path = os.path.join(workdir, f"{slug}-{i}.png")
+        by = {f.get("format"): f for f in e.get("formats") or []}
+        fmt = next((by[f] for f in RASTER_ORDER if f in by), None)
+        if not fmt:
+            continue
+        path = os.path.join(workdir, f"{slug}-{i}.{fmt['format']}")
         try:
-            fetch(url, path)
-            Image.open(path).verify()
-        except Exception as e:
+            if not os.path.exists(path):
+                fetch(fmt["src"], path)
+            im = ink.trim(ink.load(path))
+        except Exception as ex:
+            errors.append(f"{e.get('type')}/{e.get('theme')}: {ex}")
             continue
-        frac = coloured_fraction(path)
-        if not want_mono:
-            return path, None
-        if frac < FRAC_THRESH:
-            return path, None
-        if frac < best_frac:
-            best, best_frac = path, frac
-    if best is None:
-        return None, f"{brand['name']}: no candidate downloaded successfully"
-    return best, (f"{brand['name']}: no fully monochrome variant — best candidate "
-                  f"is {best_frac*100:.1f}% coloured. Accept it, switch this brand "
-                  f"to its symbol, or drop it. (Never force-tint.)")
+        prof = ink.profile(im)
+        out.append({"type": e.get("type"), "theme": e.get("theme"), "image": im,
+                    "prof": prof, "aspect": im.width / im.height})
+    primary = [c for c in out if c["type"] == kind]
+    if primary:
+        ref = primary[0]["aspect"]
+        out = [c for c in out if c["type"] == kind or abs(math.log(c["aspect"] / ref)) < 0.4]
+    else:
+        # no labelled mark of this kind: judge "other" entries by shape
+        out = [c for c in out if (c["aspect"] >= 1.6) == (kind == "logo")]
+    out.sort(key=lambda c: c["type"] != kind)          # labelled first
+    return out, errors
 
 
-def grid_shape(n, cols):
-    if cols:
-        return cols, math.ceil(n / cols)
-    cols = 3 if n <= 6 else 4 if n <= 12 else 5 if n <= 20 else 6
-    return cols, math.ceil(n / cols)
+def pick_mono(cands, ground, kind):
+    target = "light" if is_dark(ground) else "dark"
+    tiers = [
+        ("official mono", lambda c: ink.is_mono(c["prof"]) and c["prof"]["polarity"] == target),
+        ("official mono, recoloured", lambda c: ink.is_mono(c["prof"])),
+        ("flattened from colour", lambda c: True),
+    ]
+    pick = None
+    for label, ok in tiers:
+        pick = next(((c, label) for c in cands if ok(c)), None)
+        if pick:
+            break
+    c, label = pick
+    # An unlabelled "other" variant is sometimes a different lockup — Slack's
+    # only mono wordmark is "slack from Salesforce". When it does not share
+    # the primary mark's silhouette and the primary flattens cleanly, the
+    # primary wins: the wall should show the logo people know.
+    primary = next((p for p in cands if p["type"] == kind), None)
+    if primary and c["type"] == "other" and ink.silhouette_iou(c["image"], primary["image"]) < 0.8:
+        if ink.structure_loss(primary["image"], primary["prof"]) < REVIEW_LOSS:
+            return primary, "flattened from colour (the only mono variant is a different lockup)"
+        return c, label + " — a different lockup from the primary logo, check it"
+    return c, label
 
 
-def build(cfg, out, check_only=False):
-    bg = cfg.get("background", "dark")
-    bg_hex = DARK if bg == "dark" else LIGHT if bg == "light" else bg.lstrip("#").upper()
-    want_mono = bool(cfg.get("mono", True))
-    workdir = "wall_assets"
+def pick_color(cands, ground):
+    prefer = "light" if is_dark(ground) else "dark"
+    order = sorted(cands, key=lambda c: (c["type"] == "other", c["theme"] != prefer))
+    scored = [(c, ink.visibility(c["image"], ground)) for c in order]
+    for c, v in scored:
+        if v >= ink.VISIBLE:
+            return c, f"{c['theme']} variant, {v:.0%} visible", None
+    best = max(scored, key=lambda s: s[1], default=(None, 0))
+    return best[0], "best available", (
+        f"not visible in colour on #{ground} (best {best[1]:.0%}) — switch the wall "
+        f"to mono, accept, or drop")
 
-    resolved, flags = [], []
-    for brand in cfg["brands"]:
-        path, flag = resolve_brand(brand, workdir, want_mono)
-        if flag:
-            flags.append(flag)
-        if path:
-            resolved.append({"name": brand["name"], "path": path,
-                             "ratio": ink_ratio(path)})
 
-    cols, rows = grid_shape(len(resolved), cfg.get("cols"))
-    print(f"brands resolved: {len(resolved)}/{len(cfg['brands'])}  "
-          f"grid: {cols} x {rows}  background: {bg_hex}  mono: {want_mono}")
-    for f in flags:
-        print(f"  ! {f}")
-    if check_only:
-        print("\n--check: nothing built. Confirm the report, then run without --check.")
-        return 1 if flags else 0
+def resolve(cfg, workdir):
+    ground = ground_hex(cfg.get("background", "dark"))
+    kind = cfg.get("type", "logo")
+    style = cfg.get("style", "mono")
+    inkc = (cfg.get("ink") or ("FFFFFF" if is_dark(ground) else "111111")).lstrip("#").upper()
+    rows = []
+    for entry in cfg["brands"]:
+        entry = {"brand": entry} if isinstance(entry, str) else dict(entry)
+        brand = json.load(open(entry["brand"]))
+        api_name = (brand.get("name") or brand.get("domain") or entry["brand"]).strip()
+        name = entry.get("name") or api_name
+        slug = re.sub(r"[^a-z0-9]+", "-", (brand.get("domain") or name).lower()).strip("-")
+        row = {"name": name, "entry": entry, "flags": [], "notes": []}
+        if not entry.get("name") and "." in api_name:
+            row["notes"].append(f"Brandfetch calls it {api_name!r} — set \"name\" if that is "
+                                f"not how it should read (alt text)")
+        cands, errors = candidates(brand, kind, workdir, slug)
+        row["notes"] += [f"download failed: {e}" for e in errors]
+        if not cands:
+            row["flags"].append(f"no usable {kind} asset" + (" (downloads failed)" if errors else ""))
+            rows.append(row)
+            continue
+        if style == "mono":
+            c, how = pick_mono(cands, ground, kind)
+            loss = ink.structure_loss(c["image"], c["prof"]) if how.startswith("flattened") else 0
+            if loss >= REVIEW_LOSS:
+                row["flags"].append(
+                    f"flattened from colour, and colour carries {loss:.0%} of its drawing "
+                    f"(parts merge, like Mastercard's overlap) — look at the preview: accept, "
+                    f"or drop")
+            img = ink.monochrome(c["image"], inkc, c["prof"])
+            img = ink.trim(img)
+        else:
+            c, how, flag = pick_color(cands, ground)
+            if flag:
+                row["flags"].append(flag)
+            img = c["image"]
+        if ink.secondary_line(img):
+            row["notes"].append("two-line lockup: the smaller line (tagline / endorsement) "
+                                "will read tiny on a wall — fine if that is the brand's "
+                                "current logo, otherwise drop the brand or use \"type\": \"symbol\"")
+        row.update(image=img, how=f"{c['type']} · {how}", **ink.metrics(img))
+        rows.append(row)
+    return rows, ground, inkc
 
-    from pptx import Presentation
-    from pptx.util import Inches, Pt
-    from pptx.dml.color import RGBColor
 
-    prs = Presentation()
-    prs.slide_width, prs.slide_height = Inches(SLIDE_W), Inches(SLIDE_H)
-    slide = prs.slides.add_slide(prs.slide_layouts[6])   # blank
-    slide.background.fill.solid()
-    slide.background.fill.fore_color.rgb = RGBColor.from_string(bg_hex)
+def report(rows, grid, cfg):
+    kept = [r for r in rows if "image" in r and not r["entry"].get("drop")]
+    print(f"{len(kept)}/{len(rows)} brands · grid {grid['cols']} x {grid['rows']} · "
+          f"{cfg.get('style', 'mono')} {cfg.get('type', 'logo')} on "
+          f"{cfg.get('background', 'dark')}\n")
+    for r in rows:
+        e = r["entry"]
+        state = "drop" if e.get("drop") else "FLAG" if r["flags"] and not e.get("accept") else "ok"
+        mark = {"ok": "  ", "FLAG": "! ", "drop": "- "}[state]
+        extra = " (capped to its box)" if r.get("capped") else ""
+        print(f"{mark}{r['name']:18s} {r.get('how', '—')}{extra}")
+        for f in r["flags"]:
+            print(f"      ! {f}" + ("   [accepted]" if e.get("accept") else ""))
+        for n in r["notes"]:
+            print(f"      i {n}")
+    return [r for r in rows if r["flags"] and not (r["entry"].get("accept") or r["entry"].get("drop"))]
 
-    if cfg.get("title"):
-        from pptx.enum.text import PP_ALIGN
-        tb = slide.shapes.add_textbox(Inches(MARGIN), Inches(0.55),
-                                      Inches(SLIDE_W - 2 * MARGIN), Inches(0.6))
-        p = tb.text_frame.paragraphs[0]
-        p.alignment = PP_ALIGN.LEFT
-        run = p.add_run()
-        run.text = cfg["title"]
-        run.font.size = Pt(24)
-        run.font.bold = True
-        run.font.name = "Arial"
-        dark_bg = int(bg_hex[:2], 16) * 0.3 + int(bg_hex[2:4], 16) * 0.6 < 100
-        run.font.color.rgb = RGBColor.from_string(LIGHT if dark_bg else "1A1A18")
 
-    grid_w, grid_h = SLIDE_W - 2 * MARGIN, SLIDE_H - TOP - BOTTOM
-    cell_w, cell_h = grid_w / cols, grid_h / rows
-    box_w, box_h = cell_w * 0.66, cell_h * 0.42
+def main(path, check):
+    cfg = json.load(open(path))
+    base = os.path.dirname(os.path.abspath(path))
+    os.chdir(base)
+    rows, ground, inkc = resolve(cfg, "wall_assets")
+    marks = [r for r in rows if "image" in r and not r["entry"].get("drop")
+             and not (r["flags"] and not r["entry"].get("accept") and not check)]
+    if not marks:
+        report(rows, {"cols": 0, "rows": 0}, cfg)
+        sys.exit("nothing to place")
+    grid = L.layout(marks, title=bool(cfg.get("title")), cols=cfg.get("cols"),
+                    kind=cfg.get("type", "logo"))
+    open_flags = report(rows, grid, cfg)
+    spec = {"title": cfg.get("title"), "background": ground,
+            "text": "FFFFFF" if is_dark(ground) else "111111"}
+    out = cfg.get("out", "logo-wall")
 
-    # pass 1: natural contained size per logo
-    for r in resolved:
-        w = box_w
-        h = w / r["ratio"]
-        if h > box_h:
-            h, w = box_h, box_h * r["ratio"]
-        r["w"], r["h"] = w, h
+    if check:
+        W.png(f"{out}.preview.png", marks, spec)
+        print(f"\npreview: {os.path.join(base, out + '.preview.png')}  (flagged brands included)")
+        if open_flags:
+            print(f"{len(open_flags)} brand(s) need a decision: add \"accept\": true or "
+                  f"\"drop\": true to their entry in {os.path.basename(path)}.")
+        return 1 if open_flags else 0
 
-    # pass 2: clamp heights to a band around the median — vary within bounds.
-    # Naive sizing looks organic when the set cooperates; the clamp is what
-    # keeps one square symbol or one skyscraper glyph from wrecking the wall.
-    heights = sorted(r["h"] for r in resolved)
-    med = heights[len(heights) // 2]
-    hi, lo = med * CLAMP_HI, med * CLAMP_LO
-    for r in resolved:
-        h, w = r["h"], r["w"]
-        if h > hi:
-            h, w = hi, hi * r["ratio"]
-        elif h < lo:
-            h, w = lo, lo * r["ratio"]
-            if w > box_w:
-                w, h = box_w, box_w / r["ratio"]
-        r["w"], r["h"] = w, h
-
-    # place; centre a partial last row
-    for i, r in enumerate(resolved):
-        row, col = divmod(i, cols)
-        in_row = cols if row < rows - 1 else len(resolved) - (rows - 1) * cols
-        row_offset = (cols - in_row) * cell_w / 2 if row == rows - 1 else 0
-        cx = MARGIN + row_offset + col * cell_w
-        cy = TOP + row * cell_h
-        slide.shapes.add_picture(r["path"],
-                                 Inches(cx + (cell_w - r["w"]) / 2),
-                                 Inches(cy + (cell_h - r["h"]) / 2),
-                                 Inches(r["w"]), Inches(r["h"]))
-
-    prs.save(out)
-    print(f"\nwritten: {out}")
-    if flags:
-        print("shipped WITH flags above — make sure the user accepted them.")
+    if open_flags:
+        print(f"\nnot built: {len(open_flags)} unresolved flag(s) — decide in "
+              f"{os.path.basename(path)} (\"accept\" / \"drop\"), then rerun.")
+        return 2
+    written = []
+    for fmt in cfg.get("formats", ["pptx"]):
+        target = f"{out}.{fmt}"
+        if fmt == "pptx":
+            W.pptx(target, marks, spec)
+        elif fmt == "pdf":
+            W.pdf(target, marks, spec)
+        elif fmt == "html":
+            W.html_page(target, marks, spec, grid)
+        elif fmt == "png":
+            W.png(target, marks, spec, dpi=300)
+        else:
+            print(f"  ? unknown format {fmt!r} skipped")
+            continue
+        written.append(os.path.join(base, target))
+    W.png(f"{out}.preview.png", marks, spec)
+    print("\nwritten:\n  " + "\n  ".join(written))
+    print(f"preview: {os.path.join(base, out + '.preview.png')}")
     return 0
 
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    if len(args) < 1:
-        sys.exit("usage: build_wall.py wall.json [out.pptx] [--check]")
-    cfg = json.load(open(args[0]))
-    out = args[1] if len(args) > 1 else "wall.pptx"
-    sys.exit(build(cfg, out, check_only="--check" in sys.argv))
+    if len(args) != 1:
+        sys.exit("usage: build_wall.py wall.json [--check]")
+    sys.exit(main(args[0], "--check" in sys.argv))

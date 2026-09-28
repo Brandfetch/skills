@@ -1,7 +1,42 @@
-# Instrumenting your own template
+# Your own template
 
 The bundled `assets/template.pptx` is a reference, not the product. This is
 how to make the skill fill **your** deck.
+
+## The easy way: onboard a deck you already sent
+
+Attach a deck you have already sent to a real client and say *"set up my
+template"*. Claude:
+
+1. looks up that client on Brandfetch and finds everything in the deck that
+   came from them — their name, description, firmographics, and every
+   picture that matches one of their logos, by file or by image;
+2. proposes the per-deal values too — dates, amounts, labelled fields like
+   `Sector: Retail` — named after their labels (`Kick-off` →
+   `{kick_off_date}`), and asks about anything it is unsure of;
+3. writes the template once you agree, test-fills it with a different brand,
+   and shows you both;
+4. asks before it replaces the skill's template, and does nothing until you
+   say yes.
+
+Under the hood that is `scripts/instrument_template.py` (`--detect`, then
+`--apply`). It follows every rule below, so the result is exactly what you
+would have built by hand: tokens as visible text, dashed slot shapes where the
+client's logos were, the previous client's image files removed from the
+package.
+
+What it cannot know on its own: free text written for that one client (a
+scope line, a project name). Tell it what else changes per deck and it
+becomes a token too.
+
+The rest of this guide is the contract those templates follow — read it to
+fine-tune an onboarded template, or to instrument one by hand.
+
+## Instrumenting by hand (advanced)
+
+Everything onboarding does, you can do in your slide editor. It is the
+right path for a template designed from scratch, with no sent deck to learn
+from.
 
 ## The contract
 
@@ -49,18 +84,30 @@ overlays a fitted picture. Fit is inferred from the slot itself:
 | large square frame (≥0.5", within 5%) | tight contain — fills the square, no inset |
 | everything else | contain with a safe-box inset — wordmarks are never cropped |
 
-**Pick the theme token to match the ground.** `theme` names the **asset's own
-colour**, not the background: `light` is a white mark for dark grounds,
-`dark` a near-black mark for light grounds.
+**Use `{bf:logo}` and `{bf:symbol}`; the builder picks light or dark.** For
+every logo slot it reads the colour the mark will sit on — the slot's own
+tile fill, a filled shape underneath, else the slide / layout / master
+background — downloads both variants, and measures how much of each is
+actually visible there (pixel contrast, not the theme label). It places the
+first visible one: the white mark on a dark ground, the dark mark on a light
+one, and a *coloured* "dark" mark on a mid-dark ground when that is what the
+brand has. If neither variant would show, the slot is left empty with its
+dashed box, and the build output says why:
 
-| Ground | Logo token | Symbol token |
-|---|---|---|
-| dark slide | `{bf:lightOrDarkLogo}` | `{bf:lightOrDarkSymbol}` |
-| light slide | — (use dark chain) | `{bf:darkOrLightSymbol}` |
+```
+slide2.xml  {bf:symbol}  LEFT EMPTY: no variant visible on #F1EFE8 (light 0%)
+```
 
-Get this wrong and a monochrome brand renders invisible — a *coloured* brand
-will hide the mistake, which is exactly why it survives review. The scanner
-checks each logo slot against its slide's background and warns.
+The older tokens still work and only set which variant is tried first:
+
+| Token | Tries first |
+|---|---|
+| `{bf:logo}` / `{bf:symbol}` | whatever the ground calls for (recommended) |
+| `{bf:lightOrDarkLogo}` / `{bf:lightOrDarkSymbol}` | the white mark |
+| `{bf:darkOrLightLogo}` / `{bf:darkOrLightSymbol}` | the dark mark |
+
+Neither kind will place a mark that would vanish. `theme` names the **mark's
+own colour**, not the background: `light` is a white mark, `dark` a dark one.
 
 **Two logos on one slide will not weight-match.** Contain-fit equalises
 frames, not marks: a near-square symbol fills a shared square while a 1.6:1
@@ -86,7 +133,7 @@ costs: recipients without the font get a substituted layout, and your own
 preview becomes untrustworthy for overflow (see `setup.md`). The reference
 template is Arial with ~15% frame slack for exactly this reason.
 
-## Checklist for a new template
+## Checklist for a hand-built template
 
 1. Type tokens as visible text into the shapes that should hold them.
 2. Dash the borders of slot shapes; keep design borders solid.

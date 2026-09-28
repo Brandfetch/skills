@@ -107,9 +107,28 @@ def _chain(brand, logo_type, themes):
     return None
 
 
+def bf_logo(brand):
+    """
+    {bf:logo} — the logo, theme chosen at BUILD time from the ground the slot
+    sits on (see THEMED). Resolves here to whichever variant exists, so a
+    brand with no logo at all is still reported missing.
+    """
+    return _chain(brand, "logo", ["light", "dark"])
+
+
+def bf_symbol(brand):
+    """{bf:symbol} — the symbol, theme chosen at build time like {bf:logo}."""
+    return _chain(brand, "symbol", ["light", "dark"])
+
+
 def bf_light_or_dark_logo(brand):
     """{bf:lightOrDarkLogo} — logo, light preferred, dark as fallback."""
     return _chain(brand, "logo", ["light", "dark"])
+
+
+def bf_dark_or_light_logo(brand):
+    """{bf:darkOrLightLogo} — logo, dark preferred, light as fallback."""
+    return _chain(brand, "logo", ["dark", "light"])
 
 
 def bf_dark_or_light_symbol(brand):
@@ -160,10 +179,38 @@ TEXT_SLOTS = {
 IMAGE_SLOTS = {
     "{bf:banner}": (bf_banner, "cover"),
     "{bf:icon}": (bf_icon, "cover"),
+    "{bf:logo}": (bf_logo, "contain"),
+    "{bf:symbol}": (bf_symbol, "contain"),
     "{bf:lightOrDarkLogo}": (bf_light_or_dark_logo, "contain"),
+    "{bf:darkOrLightLogo}": (bf_dark_or_light_logo, "contain"),
     "{bf:darkOrLightSymbol}": (bf_dark_or_light_symbol, "contain"),
     "{bf:lightOrDarkSymbol}": (bf_light_or_dark_symbol, "contain"),
 }
+
+
+# Slots whose light/dark variant the builder picks per slot, by measuring
+# which one is actually visible on the colour underneath it.
+#   (logo type, preferred theme) — None means "whichever the ground calls for".
+# The chain tokens only set the order tried; a variant that would vanish on
+# its ground is never placed, whatever the token asked for.
+THEMED = {
+    "{bf:logo}": ("logo", None),
+    "{bf:symbol}": ("symbol", None),
+    "{bf:lightOrDarkLogo}": ("logo", "light"),
+    "{bf:darkOrLightLogo}": ("logo", "dark"),
+    "{bf:lightOrDarkSymbol}": ("symbol", "light"),
+    "{bf:darkOrLightSymbol}": ("symbol", "dark"),
+}
+
+
+def theme_variants(brand, logo_type):
+    """{theme: format entry} for every theme this logo type exists in."""
+    out = {}
+    for theme in ("light", "dark"):
+        hit = _find_logo(brand, logo_type, theme)
+        if hit:
+            out[theme] = hit
+    return out
 
 
 def resolve(brand):
@@ -180,6 +227,8 @@ def resolve(brand):
         hit = fn(brand)
         if hit:
             images[slot] = {"src": hit["src"], "format": hit["format"], "fit": fit}
+            if slot in THEMED:
+                images[slot]["variants"] = theme_variants(brand, THEMED[slot][0])
         else:
             missing.append(slot)
 

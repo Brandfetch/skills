@@ -42,8 +42,18 @@ Verified empirically: `theme=light` is a white mark (for dark grounds),
 > so it would only surface on a monochrome client, exactly when nobody is
 > looking.
 
-Fallback chains never cross type: no symbol at either theme leaves the slot
-empty rather than borrowing the icon.
+So the theme is chosen per slot at build time, by pixels: the builder
+measures each variant against the colour under that slot (≥50% of the
+mark's opaque pixels at ≥1.5:1 contrast) and places the first that passes.
+The label alone is not enough — "dark" variants are often coloured and read
+fine on a dark-grey card, while a black one vanishes.
+
+> A 2:1 bar rejected Spotify's green symbol on an off-white tile (1.6:1),
+> which reads perfectly well. The failures the check exists for sit near
+> 1:1 — white on off-white ~1.15, black on near-black ~1.1.
+
+Nothing visible → the slot stays empty with its dashed box. Fallback never
+crosses type: no symbol at either theme never borrows the icon.
 
 ## 4. Overlay slots, never replace them
 

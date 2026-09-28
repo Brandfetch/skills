@@ -21,6 +21,7 @@ import io
 import json
 import re
 import sys
+import shutil
 import zipfile
 import subprocess
 
@@ -143,6 +144,103 @@ def fetch(url, dest):
     return dest
 
 
+def to_raster(path, width=1600):
+    """
+    PNG path for an asset PowerPoint and Pillow can both use.
+
+    Many brands publish some variants as SVG only (often the main logo and
+    symbol), and older PowerPoint will not render WebP. Rasterise SVG with
+    cairosvg, else librsvg's rsvg-convert, else ImageMagick; convert WebP
+    with Pillow. Anything else is returned unchanged.
+    """
+    base, _, ext = path.rpartition(".")
+    png = base + ".png"
+    if ext == "webp":
+        Image.open(path).save(png)
+        return png
+    if ext != "svg":
+        return path
+    try:
+        import cairosvg
+        cairosvg.svg2png(url=path, write_to=png, output_width=width)
+        return png
+    except ImportError:
+        pass
+    for cmd in (["rsvg-convert", "-w", str(width), "-o", png, path],
+                ["magick", "-background", "none", "-density", "300", path,
+                 "-resize", f"{width}x", png]):
+        if shutil.which(cmd[0]):
+            subprocess.run(cmd, check=True, capture_output=True)
+            return png
+    raise RuntimeError(f"{path} is SVG-only: pip install cairosvg (or install librsvg)")
+
+
+# A mark counts as visible when at least this share of its opaque pixels
+# reaches CONTRAST against the ground. The failures this exists for sit near
+# 1:1 — white on off-white is ~1.15, black on near-black ~1.1 — while a
+# brand-green symbol on off-white (~1.6) reads fine. A 2:1 bar rejected
+# exactly that green, so the bar is set between the two.
+VISIBLE, CONTRAST = 0.5, 1.5
+_visibility_cache = {}
+
+
+def _rel_lum(rgb):
+    def ch(v):
+        v /= 255
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = rgb
+    return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b)
+
+
+def visibility(path, ground):
+    """
+    Share of the mark's opaque pixels that stand out against ground (hex).
+
+    Measured on the actual file, never inferred from the theme label: "dark"
+    variants are often coloured, and a coloured mark can be perfectly visible
+    on a dark-grey slide where a black one would vanish.
+    """
+    key = (path, ground)
+    if key not in _visibility_cache:
+        im = Image.open(path).convert("RGBA")
+        im.thumbnail((160, 160))
+        g = _rel_lum(tuple(int(ground[i:i + 2], 16) for i in (0, 2, 4)))
+        n = ok = 0
+        for r, gg, b, a in im.getdata():
+            if a < 128:
+                continue
+            n += 1
+            l = _rel_lum((r, gg, b))
+            if (max(l, g) + 0.05) / (min(l, g) + 0.05) >= CONTRAST:
+                ok += 1
+        _visibility_cache[key] = ok / n if n else 0.0
+    return _visibility_cache[key]
+
+
+def pick_variant(slot, variants, ground):
+    """
+    (theme, score, note) for a themed slot, or (None, None, note) to leave it
+    empty. Try the token's preferred theme first — or, for {bf:logo} and
+    {bf:symbol}, the theme the ground calls for (light mark on a dark ground)
+    — and take the first variant that is actually visible there.
+    """
+    pref = BF.THEMED[slot][1]
+    if pref is None:
+        dark_ground = ground is not None and _rel_lum(
+            tuple(int(ground[i:i + 2], 16) for i in (0, 2, 4))) < 0.18
+        pref = "light" if dark_ground else "dark"
+    order = [t for t in (pref, "dark" if pref == "light" else "light") if t in variants]
+    if ground is None:
+        return (order[0], None, "ground unknown — token preference used") if order else \
+               (None, None, "no variant")
+    scores = {t: visibility(variants[t]["path"], ground) for t in order}
+    for t in order:
+        if scores[t] >= VISIBLE:
+            return t, scores[t], f"{scores[t]:.0%} visible on #{ground}"
+    tried = ", ".join(f"{t} {v:.0%}" for t, v in scores.items())
+    return None, None, f"LEFT EMPTY: no variant visible on #{ground} ({tried})"
+
+
 def merge_split_runs(xml):
     """
     Slide editors (PowerPoint included) split text mid-string across <a:r>
@@ -154,13 +252,17 @@ def merge_split_runs(xml):
     identical. Volatile editor attributes (dirty, smtClean, err, noProof) are
     stripped before comparing: they mark spell-check state, not appearance,
     and editors apply them inconsistently across runs that look the same.
+
+    Only runs that are truly adjacent merge. A soft line break (<a:br/>) or a
+    field between runs ends the block: merging the whole paragraph into its
+    first block once duplicated every line after a shift-enter break.
     """
     volatile = re.compile(r'\s+(?:dirty|smtClean|err|noProof)="[^"]*"')
 
-    def merge_para(inner):
-        runs = re.findall(r"<a:r>(.*?)</a:r>", inner, re.S)
+    def merge_block(block):
+        runs = re.findall(r"<a:r>(.*?)</a:r>", block.group(0), re.S)
         if len(runs) < 2:
-            return inner
+            return block.group(0)
         merged = []
         for run in runs:
             rpr = re.search(r"<a:rPr[^>]*/>", run) or re.search(
@@ -174,11 +276,13 @@ def merge_split_runs(xml):
                 merged[-1][2] += text
             else:
                 merged.append([key, rpr_raw, text])
-        rebuilt = "".join(
+        return "".join(
             f"<a:r>{raw}<a:t>{text}</a:t></a:r>" for _, raw, text in merged
         )
-        # replace the contiguous run block, leaving pPr/endParaRPr intact
-        return re.sub(r"(?:<a:r>.*?</a:r>)+", rebuilt, inner, count=1, flags=re.S)
+
+    def merge_para(inner):
+        # each contiguous run block separately, leaving pPr/br/endParaRPr intact
+        return re.sub(r"(?:<a:r>.*?</a:r>)+", merge_block, inner, flags=re.S)
 
     return re.sub(
         r"(<a:p>)(.*?)(</a:p>)",
@@ -290,15 +394,26 @@ def build(template, brand, out, only_slides=None, values=None):
     text_vals, images, missing = BF.resolve(brand)
     name = text_vals["{bf:name}"]
 
-    # download every needed asset once
+    # download every needed asset once — both themes for logo/symbol slots,
+    # since which one is visible is only known per slot, from its ground
+    downloaded = {}
+
+    def download(key, fmt):
+        if key not in downloaded:
+            ext = "jpg" if fmt["format"] in ("jpeg", "jpg") else fmt["format"]
+            path = to_raster(fetch(fmt["src"], f"assets/{key}.{ext}"))
+            downloaded[key] = {"path": path, "ext": path.rpartition(".")[2],
+                               "native": native_size(path), "key": key}
+        return downloaded[key]
+
     assets = {}
     for slot, info in images.items():
-        key = slot.strip("{}").replace("bf:", "")
-        ext = "jpg" if info["format"] in ("jpeg", "jpg") else info["format"]
-        path = f"assets/{key}.{ext}"
-        fetch(info["src"], path)
-        assets[slot] = {"path": path, "fit": info["fit"], "ext": ext,
-                        "native": native_size(path)}
+        if slot in BF.THEMED:
+            typ = BF.THEMED[slot][0]
+            variants = {t: download(f"{typ}-{t}", f) for t, f in info["variants"].items()}
+        else:
+            variants = {None: download(slot.strip("{}").replace("bf:", ""), info)}
+        assets[slot] = {"fit": info["fit"], "variants": variants}
 
     with zipfile.ZipFile(template) as z:
         files = {n: z.read(n) for n in z.namelist()}
@@ -313,21 +428,15 @@ def build(template, brand, out, only_slides=None, values=None):
 
     log = []
 
-    # which slots are actually used in the slides being built?
-    used_slots = set()
-    for slide in slides:
-        xml_tmp = files[slide].decode("utf-8", "replace")
-        for tok in TOKEN.finditer(xml_tmp):
-            used_slots.add("{" + tok.group(1) + "}")
+    # media + content types are registered only for variants actually placed
+    ct_box = [files["[Content_Types].xml"].decode("utf-8")]
 
-    # register media + content types only for used slots
-    ct = files["[Content_Types].xml"].decode("utf-8")
-    for slot, a in assets.items():
-        key = slot.strip("{}").replace("bf:", "")
-        media = f"ppt/media/bf_{key}.{a['ext']}"
+    def register(a):
+        media = f"ppt/media/bf_{a['key']}.{a['ext']}"
         a["media"] = media
-        if slot not in used_slots:
-            continue
+        if media in files:
+            return media
+        ct = ct_box[0]
         files[media] = open(a["path"], "rb").read()
         mime = "image/jpeg" if a["ext"] in ("jpg", "jpeg") else f"image/{a['ext']}"
         if f'Extension="{a["ext"]}"' not in ct:
@@ -344,7 +453,12 @@ def build(template, brand, out, only_slides=None, values=None):
         if f'PartName="/{media}"' not in ct:
             ct = ct.replace("</Types>",
                             f'<Override PartName="/{media}" ContentType="{mime}"/></Types>')
-    files["[Content_Types].xml"] = ct.encode("utf-8")
+        ct_box[0] = ct
+        return media
+
+    # the ground under each slot is read with the instrumenter's slide model
+    from instrument_template import ground_under, slide_model, theme_colors
+    theme = theme_colors(files)
 
     for slide in slides:
         xml = files[slide].decode("utf-8", "replace")
@@ -356,10 +470,14 @@ def build(template, brand, out, only_slides=None, values=None):
 
         # Placeholder markers come off before anything is filled, so a filled
         # slot never ships with its dashed instrumentation border.
+        # Themed slots are stripped one by one below, once a visible variant
+        # is known: a slot left empty keeps its dashed marker.
         filled = {s for s, v in text_vals.items() if v}
-        filled |= set(assets)
+        filled |= {s for s in assets if s not in BF.THEMED}
         filled |= {t for t, v in (values or {}).items() if v}
         xml = strip_placeholder_outlines(xml, filled)
+        _, units, slide_bg = slide_model(files, slide, theme, xml)
+        unit_at = {u["start"]: u for u in units}
 
         # ── image slots ──────────────────────────────────────────────────────
         # The slot shape often CARRIES the design: the three logo tiles have
@@ -382,7 +500,21 @@ def build(template, brand, out, only_slides=None, values=None):
             if not frame:
                 log.append((slide, slot, "SKIP no xfrm"))
                 continue
-            a = assets[slot]
+            variants = assets[slot]["variants"]
+            pick_note = ""
+            if slot in BF.THEMED:
+                u = unit_at.get(m.start())
+                ground = (u["fill"] or ground_under(u, units, slide_bg)) if u else slide_bg
+                theme_pick, _, pick_note = pick_variant(slot, variants, ground)
+                if theme_pick is None:
+                    log.append((slide, slot, pick_note))
+                    continue
+                a = variants[theme_pick]
+                pick_note = f" · {theme_pick} {BF.THEMED[slot][0]}, {pick_note}"
+                sp = strip_placeholder_outlines(sp, {slot})
+            else:
+                a = variants[None]
+            media = register(a)
             fx, fy, fw, fh = frame
             shape = prst_geom(sp)
 
@@ -421,15 +553,15 @@ def build(template, brand, out, only_slides=None, values=None):
                 ox, oy, cx, cy = contain((fw, fh), a["native"], sw, sh)
                 srx = ""
 
-            if slot not in rid_for:
-                rid_for[slot] = f"rId{next_rid}"
+            if media not in rid_for:
+                rid_for[media] = f"rId{next_rid}"
                 new_rels.append(
                     f'<Relationship Id="rId{next_rid}" Type="http://schemas.'
                     f'openxmlformats.org/officeDocument/2006/relationships/image" '
-                    f'Target="../{a["media"][4:]}"/>'
+                    f'Target="../{media[4:]}"/>'
                 )
                 next_rid += 1
-            rid = rid_for[slot]
+            rid = rid_for[media]
 
             # blank the placeholder text but keep the shape and its fill
             stripped = re.sub(r"<a:t>.*?</a:t>", "<a:t></a:t>", sp, flags=re.S)
@@ -452,7 +584,8 @@ def build(template, brand, out, only_slides=None, values=None):
             out_parts.append(stripped)
             pos = m.end()
             bleed_note = f" +{bleed}emu bleed" if bleed else ""
-            log.append((slide, slot, f"{fit:7s} {cx}x{cy} in {shape} tile{bleed_note}"))
+            log.append((slide, slot,
+                        f"{fit:7s} {cx}x{cy} in {shape} tile{bleed_note}{pick_note}"))
         out_parts.append(xml[pos:])
         xml = "".join(out_parts)
 
@@ -485,6 +618,7 @@ def build(template, brand, out, only_slides=None, values=None):
                 "</Relationships>", "".join(new_rels) + "</Relationships>"
             ).encode("utf-8")
 
+    files["[Content_Types].xml"] = ct_box[0].encode("utf-8")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for n, d in files.items():
             z.writestr(n, d)

@@ -32,11 +32,11 @@ curl -sS -o /tmp/t.png "<any src URL from a fresh get_brand>" \
 
 ## 3. Python dependencies
 
-`Pillow` (pixel verification, sizing) and `python-pptx` (slide assembly).
-Both are commonly preinstalled; otherwise `pip install Pillow python-pptx`.
+Only **Pillow**. PPTX and PDF files are written directly, so `python-pptx` and
+`reportlab` are not needed.
 
-If a brand's needed variant exists only as SVG, rasterise it first:
-`pip install cairosvg`, then
-`cairosvg.svg2png(url='mark.svg', write_to='mark.png', output_width=800)`.
-WebP-only variants: convert with Pillow — older PowerPoint does not render
-WebP.
+SVG-only variants (common: some brands publish their main logo only as SVG)
+are rasterised automatically with the first of `cairosvg`, `rsvg-convert`
+(librsvg) or ImageMagick that is available. If none is, the variant is
+reported as a failed candidate — `pip install cairosvg` fixes it. WebP is
+read by Pillow directly.

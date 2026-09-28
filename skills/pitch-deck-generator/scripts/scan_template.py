@@ -34,6 +34,7 @@ KNOWN = set(BF.TEXT_SLOTS) | set(BF.IMAGE_SLOTS)
 # theme preference encoded in the token name: first word wins the chain
 THEME_PREF = {
     "{bf:lightOrDarkLogo}": "light",
+    "{bf:darkOrLightLogo}": "dark",
     "{bf:lightOrDarkSymbol}": "light",
     "{bf:darkOrLightSymbol}": "dark",
 }
@@ -81,7 +82,8 @@ def scan(path):
         raw_tokens = set(GENERIC.findall("".join(re.findall(r"<a:t>(.*?)</a:t>", raw, re.S))))
 
         seen = set()
-        for m in re.finditer(r"<p:sp>(?:(?!</p:sp>).)*?</p:sp>", merged, re.S):
+        # tables (graphicFrame) hold text tokens too — fees often live in one
+        for m in re.finditer(r"<p:(sp|graphicFrame)>(?:(?!</p:\1>).)*?</p:\1>", merged, re.S):
             sp = m.group(0)
             body = "".join(re.findall(r"<a:t>(.*?)</a:t>", sp, re.S))
             for tok in GENERIC.findall(body):
@@ -90,7 +92,8 @@ def scan(path):
                 if tok in BF.IMAGE_SLOTS and frame:
                     fit, shape = infer_fit(tok, sp, frame)
                     fw, fh = frame[2] / EMU, frame[3] / EMU
-                    print(f"  {tok:28s} image  {fw:.2f} x {fh:.2f} in  {fit} ({shape})")
+                    auto = "  light/dark picked by ground" if tok in BF.THEMED else ""
+                    print(f"  {tok:28s} image  {fw:.2f} x {fh:.2f} in  {fit} ({shape}){auto}")
                     pref = THEME_PREF.get(tok)
                     if pref and bg:
                         ground = "dark" if luminance(bg) < 128 else "light"
@@ -98,8 +101,9 @@ def scan(path):
                         if pref == ground:
                             warnings.append(
                                 f"{name}: {tok} prefers a {pref} mark but sits on a "
-                                f"{ground} background — it may render invisible. "
-                                f"Use the opposite-theme token or change the ground."
+                                f"{ground} background. The builder will not place an "
+                                f"invisible mark, but use {{bf:logo}} / {{bf:symbol}} to "
+                                f"let it pick the right variant."
                             )
                 elif tok in BF.TEXT_SLOTS:
                     print(f"  {tok:28s} text   (from get_brand)")
