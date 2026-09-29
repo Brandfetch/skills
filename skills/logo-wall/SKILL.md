@@ -29,6 +29,10 @@ with the defaults stated so the user can just say "yes":
 | **Logo type** | wordmark (most recognisable) · symbol (most uniform, for brands everyone knows) | wordmark |
 | **Title** | e.g. "Trusted by teams everywhere", or none | none |
 
+Always ask **Format**, even when the request implies one ("a trusted-by
+slide"): offer the implied format as the default and list the others — most
+users don't know PDF, HTML and PNG are possible.
+
 Never ask for a grid: it is derived (10 → 5×2, 7 → 4+3 centred). Propose it
 in the check step; accept an override (`"cols"`).
 

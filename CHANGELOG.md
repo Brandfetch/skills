@@ -16,6 +16,8 @@ match for a release.
   weight, and centres on the ink centroid. Fixed: black logos passing the
   mono check on dark walls, SVG-only logos silently dropped, 100%-coloured
   logos reported as download failures.
+- `logo-wall` always asks for the output format (PPTX, PDF, HTML, PNG), even
+  when the request implies one.
 
 - `pitch-deck-generator`: onboarding. Attach a deck you already sent a client
   and say *set up my template* — `scripts/instrument_template.py` proposes
