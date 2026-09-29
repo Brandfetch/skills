@@ -1,20 +1,21 @@
 ---
-name: pitch-deck-generator
-description: Generate a client-personalized pitch or proposal deck from a PowerPoint template, pulling the client's logos, colors, description, and firmographics from the Brandfetch MCP. Use this whenever the user wants to build, generate, personalize, or fill a sales deck, proposal, or pitch, for a named company or not yet named — "make a sales deck", "make a deck for Stripe", "personalize my template for this prospect", "generate the Acme proposal". Also use it to onboard a template from a real deck — "set up my template", "use my deck as the template", "turn this deck into a template", or an uploaded .pptx they already sent a client — and to instrument or check a PPTX template with {bf:*} or {custom} tokens.
+name: on-brand-presentations
+description: Make a sales, pitch, proposal or QBR deck for a company in verified brand data from the Brandfetch MCP — real logos, exact colors, fonts, description and firmographics. Two ways — fill the user's own PowerPoint template (or a deck they already sent a client, turned into one), or design a new deck from scratch in the brand. Use this whenever the user wants to build, generate, personalize or fill a deck, presentation or proposal — "make a sales deck", "make a deck for Stripe", "an on-brand presentation for Acme", "personalize my template for this prospect", "set up my template", "turn this deck into a template" — or to instrument or check a PPTX template with {bf:*} or {custom} tokens. For a slide of many customer logos, use logo-wall instead.
 license: MIT
 ---
 
-# Pitch deck generator
+# On-brand presentations
 
-Fills an instrumented PowerPoint template with a client's real brand assets
-and your own deal-specific values. Brand data comes from the **Brandfetch
+Makes a deck for a company from its real brand assets: either by filling
+the user's PowerPoint template with the client's brand and the deal's
+values, or by designing a new deck in the brand. Brand data comes from the **Brandfetch
 MCP**; everything else comes from the conversation. Never from anywhere else.
 
 Building a deck **never** writes to this skill or its template: the output
 is always a new file.
 
 <!-- brandfetch:choose-template -->
-## Which template
+## Which path
 
 Decide before anything else:
 
@@ -23,11 +24,10 @@ Decide before anything else:
    - **No tokens** — a deck they sent a client. Go to *Onboarding*; if they
      already named the new client ("make the same for Stripe"), use that
      client for the test-fill in step 4, so onboarding ends with their deck.
-2. **Nothing attached.** Ask once in this conversation: *"Do you want to use
-   the built-in sample template, or set up your own from a deck you've
-   already sent a client? (Attach it and tell me who it was for.)"*
-   Sample → *Every deck* with `assets/template.pptx`, a 4-slide reference
-   that shows every token. Own → *Onboarding*.
+2. **Nothing attached.** Ask once in this conversation: *"Do you have a
+   deck to start from — your template, or one you've already sent a client?
+   Attach it. Or I can design a new deck in <brand>'s brand."*
+   Attached → step 1. New design → `references/from-scratch.md`.
 <!-- /brandfetch:choose-template -->
 
 **Requirements:** the Brandfetch MCP connected, and `cdn.brandfetch.io` on
@@ -167,10 +167,10 @@ Either way, return the template file itself, named after the user's company
 (`Acme template.pptx`) — it is theirs to keep and share.
 
 **Own skill.** Name it after the user's **own** company, not the deck's
-client (`acme-pitch-deck`); ask if you do not know it. Then:
+client (`acme-presentations`); ask if you do not know it. Then:
 
 ```bash
-python3 scripts/package_skill.py template.pptx --name acme-pitch-deck \
+python3 scripts/package_skill.py template.pptx --name acme-presentations \
     --company "Acme" --out <dir> --zip
 ```
 
@@ -181,7 +181,7 @@ python3 scripts/package_skill.py template.pptx --name acme-pitch-deck \
 
 Tell them, once, in plain words:
 
-- Turn off the Brandfetch pitch-deck-generator skill once theirs is
+- Turn off the Brandfetch on-brand-presentations skill once theirs is
   installed — both answer "make a deck".
 - Their copy does not receive Brandfetch updates. To pick up a new release,
   onboard again with it and repackage.
@@ -236,7 +236,7 @@ is the cheapest place to catch a wrong employee band or a misheard fee.
 
 ### 4. Build
 
-**Use the template chosen in *Which template*.** Say which you used.
+**Use the template chosen in *Which path*.** Say which you used.
 
 ```bash
 python3 scripts/build_deck.py template.pptx brand.json out.pptx --values=values.json
@@ -276,10 +276,8 @@ what it will do, before you build.
 
 ## Files
 
-- `assets/template.pptx` — the template every build uses. Ships as a 4-slide
-  reference (every `{bf:*}` token, both fit modes, both background themes,
-  the user-token namespace; its speaker notes document each slide). Never
-  replaced: an onboarded template goes to the user, not here.
+- `references/from-scratch.md` — the new-design path: brand kit in, deck
+  out, through the environment's pptx tooling.
 - `scripts/instrument_template.py` — onboarding: `--detect` proposes,
   `--apply` writes the template.
 - `scripts/package_skill.py` — onboarding: the user's own renamed copy of

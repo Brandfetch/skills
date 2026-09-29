@@ -1,6 +1,6 @@
 ---
 name: logo-wall
-description: Generate a customer or partner logo wall — as PPTX, PDF, HTML or PNG — from a list of brands, with verified logos from the Brandfetch MCP, optically balanced so no logo looks bigger or smaller than the rest. Use this whenever the user asks for a logo wall, logo grid, logo strip, customer wall, "trusted by" or "as seen in" section, social-proof slide, or any slide or web section showing many company logos — "make a logo wall of our 12 customers", "a trusted-by slide with these brands", "put these logos on a dark background". For a full personalized deck for ONE client, use the pitch-deck-generator skill instead.
+description: Generate a customer or partner logo wall — as PPTX, PDF, HTML or PNG — from a list of brands, with verified logos from the Brandfetch MCP, optically balanced so no logo looks bigger or smaller than the rest. Use this whenever the user asks for a logo wall, logo grid, logo strip, customer wall, "trusted by" or "as seen in" section, social-proof slide, or any slide or web section showing many company logos — "make a logo wall of our 12 customers", "a trusted-by slide with these brands", "put these logos on a dark background". For a full personalized deck for ONE client, use the on-brand-presentations skill instead.
 license: MIT
 ---
 

@@ -1,7 +1,7 @@
 # Your own template
 
-The bundled `assets/template.pptx` is a reference, not the product. This is
-how to make the skill fill **your** deck.
+How to make the skill fill **your** deck. (No deck yet? Ask for a new
+design in the brand — `from-scratch.md` — and onboard that.)
 
 ## The easy way: onboard a deck you already sent
 
@@ -59,7 +59,7 @@ Two namespaces:
   `{fee}`, `{sla}`, `{seats}`, `{go_live_date}`. They are collected at build
   time and never guessed.
 
-## Conventions the reference template uses
+## Conventions worth copying
 
 Worth copying — the tooling understands them:
 
@@ -114,7 +114,7 @@ own colour**, not the background: `light` is a white mark, `dark` a dark one.
 
 **Two logos on one slide will not weight-match.** Contain-fit equalises
 frames, not marks: a near-square symbol fills a shared square while a 1.6:1
-mark is height-limited to ~60% of it. The reference template's answer is a
+mark is height-limited to ~60% of it. A good answer is a
 small (0.55") symbol + name-as-text lockup, which keeps marks minor enough
 that aspect variance stops mattering. If you need large marks side by side,
 expect to tune — set-level optical normalisation is not implemented.

@@ -66,10 +66,12 @@ WebP-only variants: convert with Pillow (`Image.open('x.webp').save('x.png')`)
 ## 5. Verify the loop once
 
 ```bash
-python3 scripts/scan_template.py assets/template.pptx     # should report no warnings
 # get_brand for any well-known domain → save verbatim as brand.json
 python3 scripts/bf_fields.py brand.json                   # preview resolution
-python3 scripts/build_deck.py assets/template.pptx brand.json out.pptx
+python3 scripts/scan_template.py template.pptx            # the user's template: no warnings
+python3 scripts/build_deck.py template.pptx brand.json out.pptx
 ```
 
-If all three run clean, the environment is ready.
+If all three run clean, the environment is ready. No template yet? The
+first `bf_fields.py` line alone proves the MCP and the data; onboarding
+exercises the rest.

@@ -3,10 +3,10 @@
 Package a copy of this skill with the user's template built in, under the
 user's own name — the "make it your own skill" end of onboarding.
 
-    python3 package_skill.py template.pptx --name acme-pitch-deck --company "Acme"
-    python3 package_skill.py template.pptx --name acme-pitch-deck --company "Acme" \
+    python3 package_skill.py template.pptx --name acme-presentations --company "Acme"
+    python3 package_skill.py template.pptx --name acme-presentations --company "Acme" \
         --out ~/.claude/skills            # Claude Code: installed for the next session
-    python3 package_skill.py template.pptx --name acme-pitch-deck --company "Acme" \
+    python3 package_skill.py template.pptx --name acme-presentations --company "Acme" \
         --out outputs --zip               # claude.ai: a zip to upload in Skills settings
 
 The copy is renamed so it never competes with the Brandfetch skill for "make
@@ -36,9 +36,10 @@ DESCRIPTION = (
 TEMPLATE_SECTION = """## Template
 
 This skill fills {company}'s template, `assets/template.pptx`, for every deck.
-A template `.pptx` attached in the conversation overrides it for that deck.
+A template `.pptx` attached in the conversation overrides it for that deck;
+a new design only when the user asks for one (`references/from-scratch.md`).
 To change the template, onboard the new deck with the Brandfetch
-pitch-deck-generator skill and package it again under this name.
+on-brand-presentations skill and package it again under this name.
 """
 
 
@@ -62,7 +63,7 @@ def rewrite_skill_md(text, name, company):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("template", help="the instrumented template.pptx from onboarding")
-    ap.add_argument("--name", required=True, help="skill name, e.g. acme-pitch-deck")
+    ap.add_argument("--name", required=True, help="skill name, e.g. acme-presentations")
     ap.add_argument("--company", required=True, help="the user's own company, e.g. Acme")
     ap.add_argument("--out", default=".", help="folder to create <name>/ in (default: .)")
     ap.add_argument("--zip", action="store_true", help="also write <out>/<name>.zip")
@@ -81,6 +82,7 @@ def main():
         sys.exit(f"{dest} already exists — pick another --name, or remove it first")
 
     shutil.copytree(SKILL_DIR, dest, ignore=lambda d, names: [n for n in names if n in SKIP])
+    os.makedirs(os.path.join(dest, "assets"), exist_ok=True)
     shutil.copyfile(a.template, os.path.join(dest, "assets", "template.pptx"))
     md = os.path.join(dest, "SKILL.md")
     with open(md, encoding="utf-8") as f:
