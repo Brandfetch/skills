@@ -36,8 +36,14 @@ match for a release.
   duplicated by the run merger.
 - `scan_template.py` now reports tokens inside tables.
 - `pitch-deck-generator` asks before the first deck whether to use the
-  sample template or onboard the user's own; once onboarded, it uses theirs
-  without asking. Also triggers on "make a sales deck".
+  sample template or onboard the user's own, and also triggers on "make a
+  sales deck". An attached template is filled directly; an attached client
+  deck is onboarded first.
+- Onboarding no longer overwrites the skill's template, so plugin updates
+  can't lose it. It ends with a choice: **your own skill** —
+  `scripts/package_skill.py` packages a renamed copy with the template built
+  in (a zip for claude.ai, or `~/.claude/skills/` in Claude Code) — or a
+  **template file** to attach per deck.
 
 ## 1.0.0 - 2026-09-15
 

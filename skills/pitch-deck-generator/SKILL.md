@@ -10,33 +10,25 @@ Fills an instrumented PowerPoint template with a client's real brand assets
 and your own deal-specific values. Brand data comes from the **Brandfetch
 MCP**; everything else comes from the conversation. Never from anywhere else.
 
-Two modes, and they never mix:
+Building a deck **never** writes to this skill or its template: the output
+is always a new file.
 
-- **Onboarding** — once. The user uploads a deck they already sent to a
-  real client; you turn it into their template through conversation. Nobody
-  types a token. This is the only mode that may change the skill.
-- **Every deck** — from then on. Fill the template for a new client.
-  Building a deck **never** modifies the skill or its template.
+<!-- brandfetch:choose-template -->
+## Which template
 
-Ships with a 4-slide reference template (`assets/template.pptx`) so the
-every-deck flow works on day one.
+Decide before anything else:
 
-**Which template, before the first deck.** Check whether `assets/template.pptx`
-is still the bundled one:
-
-```bash
-unzip -p assets/template.pptx docProps/core.xml | grep -c "Brandfetch reference template"
-```
-
-- **`1` — still the reference template.** Before anything else, ask once in
-  this conversation: *"Do you want to use the built-in 4-slide sample
-  template, or set up your own from a deck you've already sent a client?
-  (Attach it and I'll turn it into your template.)"* Own deck → Onboarding.
-  Sample → every-deck flow, and do not ask again in this conversation.
-- **`0` — the user's onboarded template.** Use it without asking; say
-  *"Using your template."*
-
-An uploaded instrumented `.pptx` in this conversation overrides both.
+1. **A `.pptx` is attached.** Scan it (`scripts/scan_template.py`).
+   - **It has tokens** — the user's template. Go to *Every deck* with it.
+   - **No tokens** — a deck they sent a client. Go to *Onboarding*; if they
+     already named the new client ("make the same for Stripe"), use that
+     client for the test-fill in step 4, so onboarding ends with their deck.
+2. **Nothing attached.** Ask once in this conversation: *"Do you want to use
+   the built-in sample template, or set up your own from a deck you've
+   already sent a client? (Attach it and tell me who it was for.)"*
+   Sample → *Every deck* with `assets/template.pptx`, a 4-slide reference
+   that shows every token. Own → *Onboarding*.
+<!-- /brandfetch:choose-template -->
 
 **Requirements:** the Brandfetch MCP connected, and `cdn.brandfetch.io` on
 the network allowlist. `references/setup.md` has the traps.
@@ -68,7 +60,11 @@ If a value is not in the conversation, **ask**. If a brand field is missing
 from the API, leave the slot empty and say so. An obvious gap is recoverable;
 a confident wrong number is not.
 
+<!-- brandfetch:onboarding -->
 ## Onboarding: set up your template
+
+Onboarding hands the user a file — a template, or their own copy of this
+skill — and never edits this folder.
 
 Triggered by "set up my template", "use my deck as the template", or an
 uploaded `.pptx` the user sent a client. The deck stays in this conversation
@@ -156,27 +152,45 @@ Go back to step 3 or 4 until the user says the template is final. Rerun
 `--apply` from the **original** deck with an updated mapping rather than
 instrumenting an instrumented file.
 
-### 6. Ask before touching the skill
+### 6. Hand it over
 
-Ask, word for word:
+Ask:
 
-> Do you want me to update your pitch-deck skill with this template?
+> Your template is ready. How do you want to use it?
+> 1. **Make it your own skill** (recommended if you'll make decks often) —
+>    I'll package a copy of this skill with your template built in. You
+>    install it once, and "make a deck for Stripe" just works.
+> 2. **Keep using the Brandfetch skill** — save this template file and
+>    attach it whenever you want a deck; I'll fill it.
 
-Wait for a clear yes. Anything else — silence, "looks good", a new request —
-is not a yes. Then:
+Either way, return the template file itself, named after the user's company
+(`Acme template.pptx`) — it is theirs to keep and share.
 
-- **Claude Code:** copy `template.pptx` over `assets/template.pptx` in this
-  skill's folder. If that folder is inside `~/.claude/plugins/`, a plugin
-  update will restore the bundled template — say so, and keep a copy
-  alongside the user's work.
-- **claude.ai:** the skill folder is read-only. Copy the whole skill folder
-  somewhere writable, replace `assets/template.pptx`, zip the folder
-  (`pitch-deck-generator/` at the root, no `__pycache__`), and return the
-  zip. Tell the user to upload it in **Customize → Skills**, and that it
-  **replaces** the current version.
+**Own skill.** Name it after the user's **own** company, not the deck's
+client (`acme-pitch-deck`); ask if you do not know it. Then:
 
-Never update the skill without that yes, and never as a side effect of
-building a deck.
+```bash
+python3 scripts/package_skill.py template.pptx --name acme-pitch-deck \
+    --company "Acme" --out <dir> --zip
+```
+
+- **Claude Code:** `--out ~/.claude/skills` installs it for the next
+  session; return the zip too, for teammates or claude.ai.
+- **claude.ai:** `--out` a writable folder; return the zip. They upload it
+  in **Settings → Capabilities → Skills**.
+
+Tell them, once, in plain words:
+
+- Turn off the Brandfetch pitch-deck-generator skill once theirs is
+  installed — both answer "make a deck".
+- Their copy does not receive Brandfetch updates. To pick up a new release,
+  onboard again with it and repackage.
+- On Team or Enterprise, an admin can give the zip to the whole
+  organization.
+
+**Brandfetch skill.** Nothing else to do. Next time: attach the template
+and say who the deck is for.
+<!-- /brandfetch:onboarding -->
 
 ## Every deck: build for a client
 
@@ -222,9 +236,7 @@ is the cheapest place to catch a wrong employee band or a misheard fee.
 
 ### 4. Build
 
-**Use the template chosen above.** An instrumented `.pptx` uploaded in this
-conversation is authoritative; otherwise `assets/template.pptx`. Say which
-you used.
+**Use the template chosen in *Which template*.** Say which you used.
 
 ```bash
 python3 scripts/build_deck.py template.pptx brand.json out.pptx --values=values.json
@@ -266,11 +278,12 @@ what it will do, before you build.
 
 - `assets/template.pptx` — the template every build uses. Ships as a 4-slide
   reference (every `{bf:*}` token, both fit modes, both background themes,
-  the user-token namespace; its speaker notes document each slide) until
-  onboarding replaces it. Its document title, "Brandfetch reference
-  template", is how the skill tells it apart from an onboarded one.
+  the user-token namespace; its speaker notes document each slide). Never
+  replaced: an onboarded template goes to the user, not here.
 - `scripts/instrument_template.py` — onboarding: `--detect` proposes,
   `--apply` writes the template.
+- `scripts/package_skill.py` — onboarding: the user's own renamed copy of
+  this skill, with their template built in.
 - `scripts/build_deck.py` — the builder.
 - `scripts/bf_fields.py` — `{bf:*}` field mapping and asset selection. Run
   standalone to preview resolved values.

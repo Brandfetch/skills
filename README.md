@@ -89,8 +89,10 @@ reference showing where tokens go — replace it with **your** deck.
 Attach your deck and say *set up my template*.
 
 Claude finds what changes per client in a deck you already sent — their name,
-logos, dates, fees — agrees the list with you, writes the template, and asks
-before it replaces the bundled one. Or instrument it by hand:
+logos, dates, fees — agrees the list with you and writes the template. Then
+you choose: **your own skill** (a renamed copy with your template built in,
+to install once or share with your team) or a **template file** you attach
+whenever you want a deck. Or instrument it by hand:
 
 1. Type tokens as visible text in your own template
    (`{bf:name}`, `{bf:logo}`, `{your_own_fields}`).
