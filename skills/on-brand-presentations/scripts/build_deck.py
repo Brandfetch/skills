@@ -430,12 +430,16 @@ def build(template, brand, out, only_slides=None, values=None):
 
     # media + content types are registered only for variants actually placed
     ct_box = [files["[Content_Types].xml"].decode("utf-8")]
+    # what this build has stored: a bf_ file already in the template is a
+    # leftover from the deck it was made from, so it is overwritten, never reused
+    placed = set()
 
     def register(a):
         media = f"ppt/media/bf_{a['key']}.{a['ext']}"
         a["media"] = media
-        if media in files:
+        if media in placed:
             return media
+        placed.add(media)
         ct = ct_box[0]
         files[media] = open(a["path"], "rb").read()
         mime = "image/jpeg" if a["ext"] in ("jpg", "jpeg") else f"image/{a['ext']}"

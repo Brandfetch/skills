@@ -15,6 +15,7 @@ onboarding and template-choice sections: it always fills its own template.
 This skill's folder is only read, never written.
 """
 import argparse
+import glob
 import os
 import re
 import shutil
@@ -22,7 +23,9 @@ import sys
 import zipfile
 
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SKIP = {"__pycache__", ".DS_Store"}
+# only the skill itself is copied: a deck, a brand.json or a preview left in
+# the folder by an earlier run must never ship inside the user's zip
+KEEP = ("SKILL.md", "scripts/*.py", "references/*.md")
 
 DESCRIPTION = (
     "Generate a pitch or proposal deck for a client from {company}'s own "
@@ -81,7 +84,11 @@ def main():
     if os.path.exists(dest):
         sys.exit(f"{dest} already exists — pick another --name, or remove it first")
 
-    shutil.copytree(SKILL_DIR, dest, ignore=lambda d, names: [n for n in names if n in SKIP])
+    for pattern in KEEP:
+        for src in sorted(glob.glob(os.path.join(SKILL_DIR, pattern))):
+            rel = os.path.relpath(src, SKILL_DIR)
+            os.makedirs(os.path.dirname(os.path.join(dest, rel)) or dest, exist_ok=True)
+            shutil.copyfile(src, os.path.join(dest, rel))
     os.makedirs(os.path.join(dest, "assets"), exist_ok=True)
     shutil.copyfile(a.template, os.path.join(dest, "assets", "template.pptx"))
     md = os.path.join(dest, "SKILL.md")

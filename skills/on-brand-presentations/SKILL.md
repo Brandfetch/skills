@@ -12,7 +12,9 @@ values, or by designing a new deck in the brand. Brand data comes from the **Bra
 MCP**; everything else comes from the conversation. Never from anywhere else.
 
 Building a deck **never** writes to this skill or its template: the output
-is always a new file.
+is always a new file. Work in the user's own folder or a scratch folder,
+**never inside this skill's folder** — the user's decks, `brand.json` and
+previews must not end up next to the skill's files.
 
 <!-- brandfetch:choose-template -->
 ## Which path

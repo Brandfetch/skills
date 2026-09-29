@@ -50,5 +50,13 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+      - name: No decks or documents in the repo
+        # A client's deck must never ship in the plugin: everything in this
+        # repo is installed on every user's machine.
+        run: |
+          found="$(git ls-files | grep -iE '\.(pptx?|potx|key|odp|pdf|docx?|zip)$' || true)"
+          if [ -n "$found" ]; then echo "Remove these files:"; echo "$found"; exit 1; fi
+          echo "no decks or documents"
+
       - name: Byte-compile skill scripts
         run: python3 -m compileall -q skills
