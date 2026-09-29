@@ -19,8 +19,8 @@ Assemble a paste-ready brand kit from Brandfetch data. The kit replaces model me
 2. **Fetch in parallel:** MCP `get_brand` and `get_brand_context` (or the HTTP endpoints above).
 3. **Assemble the kit** with these sections:
    - **Identity:** canonical name, domain, one-line description, tagline verbatim.
-   - **Logos:** for each of `logo`, `symbol`, `icon`: theme, format, and `src` URL exactly as returned. Note which slot each type is for.
-   - **Colors:** hex values with roles (`primary`, `accent`, `dark`, `light`).
+   - **Logos:** for each of `logo`, `symbol`, `icon`: theme, format, and a display URL from MCP `build_logo_urls`. Note which slot each type is for. The `src` URLs in the `get_brand` response carry a per-response credential that expires, so use them only to download files now, never as links in a kit meant to be reused.
+   - **Colors:** hex values with roles (`accent` is the primary color, then `brand`, `dark`, `light`).
    - **Typography:** `title` and `body` font names and origins.
    - **Voice:** attributes list, then the avoid-list. Include 1 or 2 verbatim phrases (tagline, mission) as tone anchors.
    - **Visual style:** style attributes from context.

@@ -20,11 +20,12 @@ Base: `https://cdn.brandfetch.io/{domain}?c={clientId}`
 
 - Size: `/w/{px}` and/or `/h/{px}` path segments; aspect ratio is preserved.
 - Theme: `/theme/light` or `/theme/dark` (pick against the rendering background: dark UI takes `light` assets).
-- Type: `icon` (default; avatars, lists), `logo` (headers, wide slots), `symbol` (mark only).
+- Type: `/type/icon` (default; avatars, lists), `/type/logo` (headers, wide slots), `/type/symbol` (mark only), as the last path segment.
 - Fallback: `/fallback/lettermark` (icons only), `/fallback/transparent`, `/fallback/brandfetch`, or `/fallback/404`.
 - Tickers, ISINs, and crypto symbols also work as the identifier.
 
 Example: `https://cdn.brandfetch.io/acme.com/w/64/theme/dark/fallback/lettermark?c={clientId}`
+Wide logo: `https://cdn.brandfetch.io/acme.com/h/32/theme/dark/fallback/transparent/type/logo?c={clientId}`
 
 ## Procedure
 

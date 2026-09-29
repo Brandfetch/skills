@@ -11,6 +11,7 @@ Implement the pattern: work email in, branded first screen out. This is a code-w
 ## Requirements
 
 - `BRANDFETCH_API_KEY` available server-side. Never expose the secret key in client code.
+- A Brandfetch client ID for the lettermark fallback URL (step 6); safe in client code.
 - Repository access. Identify the signup flow before writing anything.
 
 ## Procedure
@@ -21,10 +22,10 @@ Implement the pattern: work email in, branded first screen out. This is a code-w
 4. **Cache.** Store the response by domain (your DB or cache layer, 24h+ TTL). Repeat signups from one company must not spend credits.
 5. **Render.**
    - Logo: pick `type: "icon"` for avatars, `type: "logo"` for headers, matching the screen's theme (`light`/`dark` variants are in the record).
-   - Colors: `primary` or `accent` hex into the accent slots. Check contrast against your background before applying.
+   - Colors: the `accent` hex (the brand's primary color) into the accent slots. Check contrast against your background before applying.
    - Name and description: prefill the company profile fields, editable by the user.
-6. **Fallback.** For avatar slots with no asset, use the Logo CDN with `fallback/lettermark`: `https://cdn.brandfetch.io/{domain}?c={clientId}` (client ID from the developer dashboard). Otherwise render the default theme.
-7. **Enrich the signup record (optional).** If the user also wants new accounts enriched for routing, scoring, or reporting: from the same cached response, write `industries[0].name`, `employees`, `foundedYear`, and `location` to the CRM or database record at signup. Same call, no extra credits.
+6. **Fallback.** For avatar slots with no asset, use the Logo CDN lettermark: `https://cdn.brandfetch.io/{domain}/fallback/lettermark?c={clientId}` (client ID from the developer dashboard). Otherwise render the default theme.
+7. **Enrich the signup record (optional).** If the user also wants new accounts enriched for routing, scoring, or reporting: from the same cached response, write `company.industries[0].name`, `company.employees`, `company.foundedYear`, and `company.location` to the CRM or database record at signup. Same call, no extra credits. `company.employees` is the floor of a size band: show `10001` as "10,001+", never as an exact headcount.
 8. **Demo it.** Run the flow with 2 or 3 user-chosen test domains and show the rendered screens or component output.
 
 ## Rules

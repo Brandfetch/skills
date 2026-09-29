@@ -20,14 +20,14 @@ Produce a one-page brief on a company from its domain, grounded in Brandfetch da
    - MCP `get_brand` or `GET /v2/brands/{domain}`: logos, colors, fonts, links, industry, employees, founded year, location.
    - MCP `get_brand_context` or `GET /v2/context/{domain}` (accepts `Accept: text/markdown`): identity, positioning, voice, style.
 3. **Compose the brief** in this order, one page maximum:
-   - Header: canonical name, domain, one-line description, industry, employees, founded, HQ.
+   - Header: canonical name, domain, one-line description, industry, employees, founded, HQ. `company.employees` is the floor of a size band: show `10001` as "10,001+", never as an exact headcount.
    - Their words: tagline and mission, quoted verbatim, never paraphrased.
    - Positioning: value proposition, then audience segments. If the user said what they are selling, mark the segment that matches their buyer.
    - Products and services: names with one-line descriptions.
    - Voice: attributes, plus what the brand avoids. Useful for mirroring their language.
-   - Assets: logo and icon URLs (light and dark), primary color hex values.
+   - Assets: logo and icon URLs (light and dark), `accent` color hex (the brand's primary color).
    - Links: LinkedIn, X, and other socials from the record.
-4. **Flag mismatches.** If `canonical_name` differs from what the user said, surface it.
+4. **Flag mismatches.** If the context's `meta.canonical_name` differs from what the user said, surface it.
 5. **Optional filing.** If a CRM is connected and the user asks, save the brief as a note on the matching record.
 
 ## Rules

@@ -20,7 +20,7 @@ Theme the user's template with each prospect's verified brand assets.
 2. **Fetch each brand** via MCP `get_brand` or the HTTP endpoint. Cache by domain for the run.
 3. **Select assets per prospect.**
    - Logo: `type: "logo"` for the header slot, `type: "icon"` for favicons or small marks. Match `theme` to the template background: dark backgrounds take the `light` variant and light backgrounds the `dark` variant. Use returned `src` URLs exactly, unmodified.
-   - Colors: `primary` for the accent slot, `accent` as secondary. Compute contrast against the template background; if below WCAG AA for text, use the color only on non-text elements and say so.
+   - Colors: `accent` (the brand's primary color) for the accent slot, a `brand` color as secondary. Compute contrast against the template background; if below WCAG AA for text, use the color only on non-text elements and say so.
    - Fonts: apply the `title` font to headings when it is a common or Google font; otherwise keep the template font and note the brand font's name.
 4. **Generate one file per prospect**, named `{domain}.html` (or the template's format). Company name and description from the record can fill designated placeholders.
 5. **Deliver** the files plus an index table: domain, assets used, contrast notes, anything skipped.

@@ -30,7 +30,7 @@ Auto-detection also works via `/v2/brands/{identifier}` (resolved domain → tic
 1. **Load identifiers** from the CSV, sheet, or code. Classify each: ticker, ISIN (12 chars, 2-letter prefix + checksum), crypto symbol. Ask when a string is ambiguous between ticker and crypto (e.g. `ETH`).
 2. **Choose the path.** UI display → CDN URLs. Colors, names, or industry needed → full records; check quota first via `GET /v2/viewer` (free) and confirm if the list exceeds remaining credits.
 3. **Resolve and deduplicate.** One lookup per unique identifier.
-4. **Output.** New CSV/sheet columns (`logo_url`, and for full records `name`, `domain`, `primary_color`), or apply edits to the rendering code with theme matched to the UI background.
+4. **Output.** New CSV/sheet columns (`logo_url`, and for full records `name`, `domain`, `primary_color` from the `accent` hex), or apply edits to the rendering code with theme matched to the UI background.
 5. **Report misses.** Unresolved identifiers get the fallback URL and a flag. Coverage is top 10,000 tickers/ETFs, ISINs, top 2,000 crypto symbols; misses outside that range are expected, never hidden.
 
 ## Rules

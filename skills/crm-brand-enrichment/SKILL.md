@@ -15,14 +15,14 @@ Resolve each company's domain through the Brandfetch Brand API and write brand f
 
 ## Procedure
 
-1. **Check quota first.** Call `GET https://api.brandfetch.io/v2/viewer` (free, never consumes credits). Read `x-api-key-quota` and `x-api-key-approximate-usage` headers on responses. If remaining quota is smaller than the record count, tell the user and ask whether to enrich a subset.
+1. **Check quota first (HTTP only).** Call `GET https://api.brandfetch.io/v2/viewer` (free, never consumes credits). Read `x-api-key-quota` and `x-api-key-approximate-usage` headers on responses. If remaining quota is smaller than the record count, tell the user and ask whether to enrich a subset. With the MCP, skip this: it reports an exhausted quota itself.
 2. **Load records.** Identify the domain column or property. Normalize: lowercase, strip scheme, path, and `www.`.
 3. **Resolve each domain.** Use the MCP `get_brand` tool, or `GET https://api.brandfetch.io/v2/brands/{domain}`. Cache results by domain within the run so duplicate domains cost one call.
 4. **No domain? Search first.** Use MCP `brand_search` or `GET /v2/search/{name}`. Accept the top result only if its name closely matches the record. Otherwise list candidates and ask the user. Never guess silently.
 5. **Map fields.**
    - Logo: prefer `type: "icon"` for avatar-sized slots, `type: "logo"` for wide slots. Use the `src` URLs exactly as returned, never edited.
-   - Colors: the `primary` or `accent` hex.
-   - Company: `industries[0].name`, `employees`, `foundedYear`, `location.city` + `location.country`, `kind`.
+   - Colors: the `accent` hex (the brand's primary color).
+   - Company: `company.industries[0].name`, `company.employees`, `company.foundedYear`, `company.location.city` + `company.location.country`, `company.kind`. `company.employees` is the floor of a size band: show `10001` as "10,001+", never as an exact headcount.
    - Links: LinkedIn and Twitter/X URLs from `links`.
 6. **Write back.** Update the CRM properties or CSV columns. Create missing custom properties when the CRM allows it, after confirming names with the user.
 7. **Report.** Output a summary table: records processed, enriched, skipped (no domain, no match, quota), and fetches consumed.
