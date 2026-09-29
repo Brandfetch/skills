@@ -47,11 +47,16 @@ see the [MCP docs](https://docs.brandfetch.com/mcp/overview).
 
 ### claude.ai
 
-Add **Brandfetch** from the connector directory (**Settings → Connectors**),
-then upload the skills you want as zips of their folders in
-**Settings → Capabilities → Skills**. Team and Enterprise admins can
+**As a plugin (recommended).** It installs the MCP server and every skill at
+once. Go to **Connectors → Plugins → Add marketplace** and paste
+`https://github.com/Brandfetch/skills`. Once Brandfetch is listed in the
+plugin marketplace, you can also find it there. Team and Enterprise admins can
 distribute the plugin to the whole organization from
 **Organization settings → Plugins**.
+
+**Skill by skill.** Add **Brandfetch** from the connector directory
+(**Settings → Connectors**), then upload the skills you want as zips of their
+folders in **Settings → Capabilities → Skills**.
 
 ### Claude API
 
