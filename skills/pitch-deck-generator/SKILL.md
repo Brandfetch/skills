@@ -1,6 +1,6 @@
 ---
 name: pitch-deck-generator
-description: Generate a client-personalized pitch or proposal deck from a PowerPoint template, pulling the client's logos, colors, description, and firmographics from the Brandfetch MCP. Use this whenever the user wants to build, generate, personalize, or fill a deck, proposal, or pitch for a named company — "make a deck for Stripe", "personalize my template for this prospect", "generate the Acme proposal". Also use it to onboard a template from a real deck — "set up my template", "use my deck as the template", "turn this deck into a template", or an uploaded .pptx they already sent a client — and to instrument or check a PPTX template with {bf:*} or {custom} tokens.
+description: Generate a client-personalized pitch or proposal deck from a PowerPoint template, pulling the client's logos, colors, description, and firmographics from the Brandfetch MCP. Use this whenever the user wants to build, generate, personalize, or fill a sales deck, proposal, or pitch, for a named company or not yet named — "make a sales deck", "make a deck for Stripe", "personalize my template for this prospect", "generate the Acme proposal". Also use it to onboard a template from a real deck — "set up my template", "use my deck as the template", "turn this deck into a template", or an uploaded .pptx they already sent a client — and to instrument or check a PPTX template with {bf:*} or {custom} tokens.
 license: MIT
 ---
 
@@ -19,9 +19,24 @@ Two modes, and they never mix:
   Building a deck **never** modifies the skill or its template.
 
 Ships with a 4-slide reference template (`assets/template.pptx`) so the
-every-deck flow works on day one. If the user has not onboarded their own
-deck yet, offer it once: *"Attach a deck you've sent a client and say 'set
-up my template'."*
+every-deck flow works on day one.
+
+**Which template, before the first deck.** Check whether `assets/template.pptx`
+is still the bundled one:
+
+```bash
+unzip -p assets/template.pptx docProps/core.xml | grep -c "Brandfetch reference template"
+```
+
+- **`1` — still the reference template.** Before anything else, ask once in
+  this conversation: *"Do you want to use the built-in 4-slide sample
+  template, or set up your own from a deck you've already sent a client?
+  (Attach it and I'll turn it into your template.)"* Own deck → Onboarding.
+  Sample → every-deck flow, and do not ask again in this conversation.
+- **`0` — the user's onboarded template.** Use it without asking; say
+  *"Using your template."*
+
+An uploaded instrumented `.pptx` in this conversation overrides both.
 
 **Requirements:** the Brandfetch MCP connected, and `cdn.brandfetch.io` on
 the network allowlist. `references/setup.md` has the traps.
@@ -207,9 +222,9 @@ is the cheapest place to catch a wrong employee band or a misheard fee.
 
 ### 4. Build
 
-**Prefer an uploaded template.** The skill's `assets/template.pptx` is the
-default; if the user has uploaded an instrumented `.pptx` in this
-conversation, that one is authoritative. Say which you used.
+**Use the template chosen above.** An instrumented `.pptx` uploaded in this
+conversation is authoritative; otherwise `assets/template.pptx`. Say which
+you used.
 
 ```bash
 python3 scripts/build_deck.py template.pptx brand.json out.pptx --values=values.json
@@ -252,7 +267,8 @@ what it will do, before you build.
 - `assets/template.pptx` — the template every build uses. Ships as a 4-slide
   reference (every `{bf:*}` token, both fit modes, both background themes,
   the user-token namespace; its speaker notes document each slide) until
-  onboarding replaces it.
+  onboarding replaces it. Its document title, "Brandfetch reference
+  template", is how the skill tells it apart from an onboarded one.
 - `scripts/instrument_template.py` — onboarding: `--detect` proposes,
   `--apply` writes the template.
 - `scripts/build_deck.py` — the builder.

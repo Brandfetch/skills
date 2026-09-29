@@ -35,6 +35,9 @@ match for a release.
 - Fixed: a paragraph with a soft line break had every line after the break
   duplicated by the run merger.
 - `scan_template.py` now reports tokens inside tables.
+- `pitch-deck-generator` asks before the first deck whether to use the
+  sample template or onboard the user's own; once onboarded, it uses theirs
+  without asking. Also triggers on "make a sales deck".
 
 ## 1.0.0 - 2026-09-15
 
