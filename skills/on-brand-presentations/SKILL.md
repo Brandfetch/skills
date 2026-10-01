@@ -14,22 +14,30 @@ MCP**; everything else comes from the conversation. Never from anywhere else.
 Building a deck **never** writes to this skill or its template: the output
 is always a new file. Work in the user's own folder or a scratch folder,
 **never inside this skill's folder** — the user's decks, `brand.json` and
-previews must not end up next to the skill's files.
+previews must not end up next to the skill's files. Commands below are
+written `<skill-dir>/scripts/…`: substitute this skill's folder path and run
+them from the working folder.
 
 <!-- brandfetch:choose-template -->
 ## Which path
 
 Decide before anything else:
 
-1. **A `.pptx` is attached.** Scan it (`scripts/scan_template.py`).
-   - **It has tokens** — the user's template. Go to *Every deck* with it.
-   - **No tokens** — a deck they sent a client. Go to *Onboarding*; if they
-     already named the new client ("make the same for Stripe"), use that
-     client for the test-fill in step 4, so onboarding ends with their deck.
-2. **Nothing attached.** Ask once in this conversation: *"Do you have a
-   deck to start from — your template, or one you've already sent a client?
-   Attach it. Or I can design a new deck in <brand>'s brand."*
-   Attached → step 1. New design → `references/from-scratch.md`.
+1. **A `.pptx` is attached.** Scan it (`<skill-dir>/scripts/scan_template.py`):
+   - **Tokens, no warnings** — the user's template. Go to *Every deck* with it.
+   - **"No tokens found"** — a deck they sent a client. Go to *Onboarding*;
+     if they already named the new client ("make the same for Stripe"), use
+     that client for the test-fill in step 4, so onboarding ends with their
+     deck.
+   - **"PARTLY FILLED DECK"** — a deck built for a client from a template.
+     Never fill it: that client's logo would stay in every deck. Ask for the
+     original template, or onboard this deck.
+   - Keynote, PDF or Google Slides: ask for a `.pptx` export.
+2. **Nothing attached.** Ask once, in one message, both what you still need:
+   *"Who is the deck for (company or domain)? And do you have a deck to
+   start from — your template, or one you've already sent a client? Attach
+   it, or I'll design a new deck."* Skip the first question if they named
+   the company. Attached → step 1. New design → `references/from-scratch.md`.
 <!-- /brandfetch:choose-template -->
 
 **Requirements:** the Brandfetch MCP connected, and `cdn.brandfetch.io` on
@@ -50,7 +58,7 @@ gap reads as an obvious blank, never a silent omission.
 
 **Never invent a customer fact or a deal value.**
 
-Every value on a slide comes from a field in the `get_brand` response or from
+Every value on a slide comes from a field in the `get_brand_data` response or from
 something the user actually said in this conversation. There is no third
 source. This rule exists because it was broken: an early build shipped
 "33,000+ employees" recalled from training data when the API said `10001`.
@@ -75,7 +83,7 @@ and never goes to Brandfetch — only the client's domain does.
 ### 1. Check the plumbing quietly
 
 Onboarding needs both halves of the pipeline, and step 3 exercises them
-anyway: the `get_brand` call for the deck's client tests the MCP, and
+anyway: the `get_brand_data` call for the deck's client tests the MCP, and
 `--brand` downloads its logos from the CDN. Say nothing about setup unless
 one of them fails — then follow `references/setup.md` (a 403 has three
 different causes; read the response body before blaming the allowlist).
@@ -91,11 +99,11 @@ than every heuristic in the script.
 
 ### 3. Detect, then propose
 
-Call `get_brand` for **that** client's domain and save the response verbatim
+Call `get_brand_data` for **that** client's domain and save the response verbatim
 to `brand.json`. Then:
 
 ```bash
-python3 scripts/instrument_template.py --detect deck.pptx \
+python3 <skill-dir>/scripts/instrument_template.py --detect deck.pptx \
     --brand=brand.json --extract=previews/ > proposal.json
 ```
 
@@ -133,8 +141,8 @@ Write the agreed mapping — the proposal with `token` set, changed or nulled
 per entry — and apply it:
 
 ```bash
-python3 scripts/instrument_template.py --apply deck.pptx mapping.json template.pptx
-python3 scripts/scan_template.py template.pptx
+python3 <skill-dir>/scripts/instrument_template.py --apply deck.pptx mapping.json template.pptx
+python3 <skill-dir>/scripts/scan_template.py template.pptx
 ```
 
 `--apply` turns text spans into tokens and client pictures into dashed slot
@@ -172,7 +180,7 @@ Either way, return the template file itself, named after the user's company
 client (`acme-presentations`); ask if you do not know it. Then:
 
 ```bash
-python3 scripts/package_skill.py template.pptx --name acme-presentations \
+python3 <skill-dir>/scripts/package_skill.py template.pptx --name acme-presentations \
     --company "Acme" --out <dir> --zip
 ```
 
@@ -198,14 +206,14 @@ and say who the deck is for.
 
 ### 1. Get the brand data
 
-Call the Brandfetch MCP `get_brand` with the client's domain and save the full
+Call the Brandfetch MCP `get_brand_data` with the client's domain and save the full
 response **verbatim** to `brand.json` — the scripts read it from disk, so
 nothing is transcribed by hand.
 
 Preview what will resolve, and show it to the user:
 
 ```bash
-python3 scripts/bf_fields.py brand.json
+python3 <skill-dir>/scripts/bf_fields.py brand.json
 ```
 
 ### 2. Collect the user-token values
@@ -213,7 +221,7 @@ python3 scripts/bf_fields.py brand.json
 Scan the template to see which non-`bf:` tokens it expects:
 
 ```bash
-python3 scripts/scan_template.py template.pptx
+python3 <skill-dir>/scripts/scan_template.py template.pptx
 ```
 
 Read the conversation first — in a real deal thread most values have already
@@ -238,13 +246,22 @@ is the cheapest place to catch a wrong employee band or a misheard fee.
 
 ### 4. Build
 
+<!-- brandfetch:which-template -->
 **Use the template chosen in *Which path*.** Say which you used.
+<!-- /brandfetch:which-template -->
 
 ```bash
-python3 scripts/build_deck.py template.pptx brand.json out.pptx --values=values.json
+python3 <skill-dir>/scripts/build_deck.py template.pptx brand.json out.pptx --values=values.json
 ```
 
-Options: `--slides=1,3` fills only those slides (useful when iterating).
+Options: `--slides=1,3` fills only those slides (useful when iterating);
+`--strip-notes` empties the speaker notes.
+
+**Speaker notes ship to the client.** The builder fills tokens in them like
+on the slides, and resets the file's title and properties. Unfilled tokens
+in notes are listed under `UNFILLED TOKENS` (`ppt/notesSlides/…`): those
+notes are template instructions, not speaker notes. Rebuild with
+`--strip-notes`, or ask the user what the notes should say.
 
 For `{bf:logo}` and `{bf:symbol}` slots the builder picks the light or dark
 variant per slot by measuring which is visible on the colour underneath, and

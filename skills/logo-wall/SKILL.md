@@ -41,11 +41,11 @@ Past ~20 logos a single wall stops being scannable — suggest the strongest
 
 ## 2. Resolve every brand and save it
 
-Call `get_brand` per domain (resolve names with `brand_search` first and
+Call `get_brand_data` per domain (resolve names with `brand_search` first and
 confirm ambiguous matches). Save each response **verbatim** to
 `brands/<domain>.json` — the script reads the logo variants from disk and
 picks between them itself. Never copy URLs into a config by hand: the `?c=`
-parameter is a per-response credential, and hand-picked variants skip the
+parameter is a credential that breaks when edited, and hand-picked variants skip the
 pixel checks below.
 
 Note the name the API returns. A surprising one (a parent brand, a

@@ -24,7 +24,7 @@ Compare an artifact against the brand's verified record and produce a fix list.
    - **Distortion:** changed aspect ratio, recolored or cropped marks.
    - **Colors:** compute distance from the nearest palette hex; beyond a stated tolerance (default: visibly different) is a finding. Report both hex values.
    - **Name:** exact match to canonical `name` in spelling and casing.
-4. **Report,** ordered by severity: identity errors, then theme/type, then color, then name. Each finding carries location, what is wrong, and the fix: correct asset `src` URL or hex value. State explicitly what was not checked (layout, typography taste).
+4. **Report,** ordered by severity: identity errors, then theme/type, then color, then name. Each finding carries location, what is wrong, and the fix: the correct logo file (downloaded from its `src` URL in the record) or hex value. State explicitly what was not checked (layout, typography taste).
 5. **Fix on request.** In editable formats, apply the swaps, then re-run steps 2 to 4 and show the clean report.
 
 ## Rules

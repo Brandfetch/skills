@@ -13,7 +13,7 @@ conversation, and the script writes the template.
     # 2. edit proposal.json with the user, then write the template
     python3 instrument_template.py --apply deck.pptx proposal.json template.pptx
 
---brand is the get_brand response for the client the deck was made for. With
+--brand is the get_brand_data response for the client the deck was made for. With
 it, detection is matching rather than guessing: the brand's exact name
 string, description, firmographics and logo files are compared against the
 deck. Without it, detection falls back to heuristics (repeated proper nouns,
@@ -553,7 +553,7 @@ def detect(deck, brand=None, extract=None):
         for tok, val in text_vals.items():
             if val:
                 brand_text.append((val, tok, "client_name" if tok == "{bf:name}" else "brand_field",
-                                   f"exact {tok} value from get_brand"))
+                                   f"exact {tok} value from get_brand_data"))
         if name and name.upper() != name:
             brand_text.append((name.upper(), "{bf:name}", "client_name",
                                "{bf:name} in capitals — the builder fills the API's casing"))
@@ -1061,6 +1061,10 @@ def apply(deck, mapping_path, out):
             ET.fromstring(files[part])
         except ET.ParseError as e:
             sys.exit(f"refusing to write: {part} is no longer well-formed XML ({e})")
+
+    # the sent deck's own title and properties usually name the previous client
+    from build_deck import clear_doc_props
+    clear_doc_props(files, os.path.splitext(os.path.basename(out))[0])
 
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in files.items():

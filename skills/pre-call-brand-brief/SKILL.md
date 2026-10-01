@@ -17,7 +17,7 @@ Produce a one-page brief on a company from its domain, grounded in Brandfetch da
 
 1. **Resolve the domain.** If given a name instead of a domain, use MCP `brand_search` or `GET https://api.brandfetch.io/v2/search/{name}`. Confirm ambiguous matches with the user before spending credits.
 2. **Fetch both records in parallel.**
-   - MCP `get_brand` or `GET /v2/brands/{domain}`: logos, colors, fonts, links, industry, employees, founded year, location.
+   - MCP `get_brand_data` or `GET /v2/brands/{domain}`: logos, colors, fonts, links, industry, employees, founded year, location.
    - MCP `get_brand_context` or `GET /v2/context/{domain}` (accepts `Accept: text/markdown`): identity, positioning, voice, style.
 3. **Compose the brief** in this order, one page maximum:
    - Header: canonical name, domain, one-line description, industry, employees, founded, HQ. `company.employees` is the floor of a size band: show `10001` as "10,001+", never as an exact headcount.

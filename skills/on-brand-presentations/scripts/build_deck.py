@@ -3,7 +3,7 @@
 Fill an instrumented PPTX template with brand data and user-supplied values.
 
 Two token namespaces, one rule:
-  {bf:*}            resolved automatically from a Brandfetch get_brand response
+  {bf:*}            resolved automatically from a Brandfetch get_brand_data response
   {anything_else}   yours — supplied via --values, never guessed
 
 Slots are found by TEXT CONTENT, not shape name (slide editors export generic
@@ -12,7 +12,7 @@ nothing about any particular template is hardcoded — move, resize or reorder
 slots freely and rebuild.
 
     python3 build_deck.py template.pptx brand.json out.pptx \
-        [--values=values.json] [--slides=1,3]
+        [--values=values.json] [--slides=1,3] [--strip-notes]
 
 An unfilled token stays visible as {token} in the output, so a gap reads as an
 obvious blank to fill rather than a silent omission.
@@ -32,21 +32,25 @@ import bf_fields as BF
 EMU = 914400
 SAFE_W, SAFE_H = 0.76, 0.62      # inset for contain-fit inside a slot frame
 
-# Tolerant matcher: accepts {bf:x}, {{bf:x}, {{bf:x}} — the template has
-# malformed doubled braces on two slots and exact matching would silently
-# skip them, leaving those cards empty.
+# Tolerant matcher: accepts {bf:x}, {{bf:x}, {{bf:x}} — templates retyped in
+# an editor often carry doubled braces, and exact matching would silently
+# skip those slots, leaving the cards empty.
 TOKEN = re.compile(r"\{{1,2}(bf:[A-Za-z]+)\}{1,2}")
 
 # Text widths are MEASURED in a real font, not estimated — a guessed advance
-# width is how text slots end up overflowing. The bundled template uses Arial;
-# Liberation Sans is metrics-compatible and present on most Linux systems. If
-# your template uses another font, put its .ttf paths first in these lists.
+# width is how text slots end up overflowing. Arial (macOS, Windows) or the
+# metrics-compatible Liberation Sans (most Linux) is measured first. If your
+# template uses another font, put its .ttf paths first in these lists.
 FONT_CANDIDATES = {
     False: [
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "C:/Windows/Fonts/arial.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ],
     True: [
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ],
@@ -64,6 +68,9 @@ def measure(text, pt, bold=False):
             return f.getlength(text) / 4, pt * 1.25
         except Exception:
             continue
+    if not getattr(measure, "warned", False):
+        measure.warned = True
+        print("  warning: no measuring font found, text fit is estimated", file=sys.stderr)
     return len(text) * pt * 0.5, pt * 1.25   # crude fallback: no font found
 
 
@@ -132,9 +139,9 @@ def ln_width(fragment):
 
 def fetch(url, dest):
     """
-    Download with curl, exactly as given. The `src` URLs in a get_brand
-    response carry per-request credentials in `?c=` — edit or rebuild the URL
-    and the CDN 302s to a hotlink-policy page, which surfaces as a 403.
+    Download with curl, exactly as given. The `src` URLs in a get_brand_data
+    response carry a credential in `?c=` — edit or rebuild the URL and the
+    CDN 302s to a hotlink-policy page, which surfaces as a 403.
     """
     import os
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
@@ -390,18 +397,40 @@ def strip_placeholder_outlines(xml, filled):
     return "".join(out)
 
 
-def build(template, brand, out, only_slides=None, values=None):
+def clear_doc_props(files, title):
+    """
+    Reset the file's own title and blank the properties that travel with it
+    (subject, description, keywords): a template's are its author's or the
+    previous client's, and they ship inside every deck built from it.
+    """
+    part = "docProps/core.xml"
+    if part not in files:
+        return
+    xml = files[part].decode("utf-8", "replace")
+    esc = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    xml = re.sub(r"<dc:title>.*?</dc:title>|<dc:title/>", f"<dc:title>{esc}</dc:title>", xml, flags=re.S)
+    for tag in ("dc:subject", "dc:description", "cp:keywords"):
+        xml = re.sub(rf"<{tag}>.*?</{tag}>", f"<{tag}></{tag}>", xml, flags=re.S)
+    files[part] = xml.encode("utf-8")
+
+
+def build(template, brand, out, only_slides=None, values=None, strip_notes=False):
+    import os
+    import tempfile
     text_vals, images, missing = BF.resolve(brand)
     name = text_vals["{bf:name}"]
 
     # download every needed asset once — both themes for logo/symbol slots,
-    # since which one is visible is only known per slot, from its ground
+    # since which one is visible is only known per slot, from its ground.
+    # Into a temporary folder, never the working directory: that may be the
+    # skill's own folder, and nothing of the user's belongs there.
     downloaded = {}
+    tmp = tempfile.mkdtemp(prefix="bf-deck-")
 
     def download(key, fmt):
         if key not in downloaded:
             ext = "jpg" if fmt["format"] in ("jpeg", "jpg") else fmt["format"]
-            path = to_raster(fetch(fmt["src"], f"assets/{key}.{ext}"))
+            path = to_raster(fetch(fmt["src"], os.path.join(tmp, f"{key}.{ext}")))
             downloaded[key] = {"path": path, "ext": path.rpartition(".")[2],
                                "native": native_size(path), "key": key}
         return downloaded[key]
@@ -622,6 +651,26 @@ def build(template, brand, out, only_slides=None, values=None):
                 "</Relationships>", "".join(new_rels) + "</Relationships>"
             ).encode("utf-8")
 
+    # ── speaker notes ────────────────────────────────────────────────────────
+    # Notes ship to the client with the deck, so they get the same values as
+    # the slides — or, with strip_notes, no text at all.
+    notes = sorted(n for n in files if re.fullmatch(r"ppt/notesSlides/notesSlide\d+\.xml", n))
+    for part in notes:
+        xml = files[part].decode("utf-8", "replace")
+        if strip_notes:
+            xml = re.sub(r"<a:t>.*?</a:t>", "<a:t></a:t>", xml, flags=re.S)
+        else:
+            xml = merge_split_runs(xml)
+            for slot, val in text_vals.items():
+                if val:
+                    xml = xml.replace(slot, val)
+            for token, val in (values or {}).items():
+                if val:
+                    xml = xml.replace(token, str(val))
+        files[part] = xml.encode("utf-8")
+
+    clear_doc_props(files, os.path.splitext(os.path.basename(out))[0])
+
     files["[Content_Types].xml"] = ct_box[0].encode("utf-8")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for n, d in files.items():
@@ -633,7 +682,12 @@ def build(template, brand, out, only_slides=None, values=None):
         vis = "".join(re.findall(r"<a:t>(.*?)</a:t>",
                                  files[slide].decode("utf-8", "replace"), re.S))
         leftover += [(slide, t) for t in re.findall(r"\{[^}]{1,30}\}", vis)]
+    for part in notes:
+        vis = "".join(re.findall(r"<a:t>(.*?)</a:t>",
+                                 files[part].decode("utf-8", "replace"), re.S))
+        leftover += [(part, t) for t in re.findall(r"\{[^}]{1,30}\}", vis)]
 
+    shutil.rmtree(tmp, ignore_errors=True)
     return {"text": text_vals, "missing": missing, "log": log, "leftover": leftover}
 
 
@@ -641,7 +695,7 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if len(args) != 3:
         sys.exit("usage: build_deck.py template.pptx brand.json out.pptx "
-                 "[--values=values.json] [--slides=1,3]")
+                 "[--values=values.json] [--slides=1,3] [--strip-notes]")
     tpl, bj, out = args
 
     only, values = None, None
@@ -651,7 +705,7 @@ if __name__ == "__main__":
         elif a.startswith("--values="):
             values = json.load(open(a.split("=", 1)[1]))
 
-    r = build(tpl, json.load(open(bj)), out, only, values)
+    r = build(tpl, json.load(open(bj)), out, only, values, "--strip-notes" in sys.argv)
 
     for k, v in r["text"].items():
         print(f"  {k:26s} {v!r}")

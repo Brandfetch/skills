@@ -6,9 +6,9 @@ to get "simplified" away by whoever reads it next.
 
 ## 1. Never invent a fact
 
-Every value comes from `get_brand` or from the conversation. No third source.
+Every value comes from `get_brand_data` or from the conversation. No third source.
 
-> `get_brand` returned `employees: 10001`. The slide shipped "33,000+
+> `get_brand_data` returned `employees: 10001`. The slide shipped "33,000+
 > employees", recalled from an AI model's training data. Plausible,
 > fabricated, and invisible to a proofreader.
 
@@ -18,9 +18,9 @@ never carry a value over from a different client's deck.
 
 ## 2. Fetch assets by direct download of the `src` URLs
 
-Use the `src` URLs from `get_brand` **exactly as returned** — `curl` them to
-disk. The `?c=` query parameter is a per-response credential; editing or
-rebuilding the URL breaks it.
+Use the `src` URLs from `get_brand_data` **exactly as returned** — `curl` them to
+disk. The `?c=` query parameter is a credential; editing or rebuilding the
+URL breaks it. It does not expire, so a saved `src` URL keeps working.
 
 - `build_logo_urls` output is display-only. Fetching it programmatically 302s
   to a hotlink-policy page.

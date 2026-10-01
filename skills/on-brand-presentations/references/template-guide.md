@@ -142,5 +142,5 @@ template is Arial with ~15% frame slack for exactly this reason.
 2. Dash the borders of slot shapes; keep design borders solid.
 3. Match each logo token's theme to its slide's ground (table above).
 4. Put per-slide instructions in speaker notes, not on the slide.
-5. `python3 scripts/scan_template.py your-template.pptx` — fix every warning.
+5. `python3 <skill-dir>/scripts/scan_template.py your-template.pptx` — fix every warning.
 6. Build once against a real brand and *look at the render* before trusting it.

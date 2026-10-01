@@ -8,8 +8,8 @@ Symptom → most likely cause, in the order actually seen in practice.
 1. Host not on your network allowlist — the response *body* says so
    explicitly; read it. Remember allowlist changes need a **new
    conversation** to take effect.
-2. The `?c=` credential is stale or was edited. `src` URLs are per-response;
-   get a fresh `get_brand` and use its URL verbatim.
+2. The `?c=` credential was edited, or the URL was rebuilt by hand. Use the
+   `src` URL from the `get_brand_data` response verbatim.
 3. You fetched a `build_logo_urls` URL. Those are display-only by design —
    they 302 to a hotlink page, whose host is not allowlisted, hence 403.
 

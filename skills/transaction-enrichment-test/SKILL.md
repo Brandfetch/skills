@@ -30,5 +30,6 @@ Resolve raw payment descriptors to merchants and report the match rate honestly.
 
 - Never infer a merchant from the descriptor text yourself. The API's answer or `unresolved` are the only two outcomes.
 - On HTTP 429, stop immediately and report how many rows completed. Do not retry in a loop.
+- A 400 `Failed to enrich transaction` means no confident match: mark the row `unresolved` and continue. It is an expected outcome, not a bug: never report it with `send_feedback`.
 - Recommended production handling, and say this in the report: cache resolutions by normalized descriptor text, and show raw text when a descriptor cannot be resolved.
 - Transaction API is an enterprise product. If the key lacks access, report the exact error and point to Talk to sales; do not fall back to guessing merchants via search.

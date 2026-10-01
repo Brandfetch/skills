@@ -19,7 +19,7 @@ Resolve financial identifiers to logos or full brand records.
 `https://cdn.brandfetch.io/{identifier}/w/{px}/theme/{light|dark}/fallback/lettermark?c={clientId}`
 Works for tickers, ISINs, and crypto symbols. With the MCP, `build_logo_urls` accepts a list of identifiers and an explicit `identifier_type` in one call. Hotlink these URLs; do not fetch them programmatically.
 
-**Full record (1 credit each).** MCP `get_brand`, or explicit HTTP routes:
+**Full record (1 credit each).** MCP `get_brand_data`, or explicit HTTP routes:
 - `GET https://api.brandfetch.io/v2/brands/ticker/{ticker}`
 - `GET /v2/brands/isin/{isin}`
 - `GET /v2/brands/crypto/{symbol}`
@@ -30,7 +30,7 @@ Auto-detection also works via `/v2/brands/{identifier}` (resolved domain → tic
 1. **Load identifiers** from the CSV, sheet, or code. Classify each: ticker, ISIN (12 chars, 2-letter prefix + checksum), crypto symbol. Ask when a string is ambiguous between ticker and crypto (e.g. `ETH`).
 2. **Choose the path.** UI display → CDN URLs. Colors, names, or industry needed → full records; check quota first via `GET /v2/viewer` (free) and confirm if the list exceeds remaining credits.
 3. **Resolve and deduplicate.** One lookup per unique identifier.
-4. **Output.** New CSV/sheet columns (`logo_url`, and for full records `name`, `domain`, `primary_color` from the `accent` hex), or apply edits to the rendering code with theme matched to the UI background.
+4. **Output.** New CSV/sheet columns (`logo_url`: the CDN URL on the display path, the icon's `src` URL from the record on the full-record path; and for full records `name`, `domain`, `primary_color` from the `accent` hex), or apply edits to the rendering code with theme matched to the UI background.
 5. **Report misses.** Unresolved identifiers get the fallback URL and a flag. Coverage is top 10,000 tickers/ETFs, ISINs, top 2,000 crypto symbols; misses outside that range are expected, never hidden.
 
 ## Rules

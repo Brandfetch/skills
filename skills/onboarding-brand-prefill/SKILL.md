@@ -19,9 +19,9 @@ Implement the pattern: work email in, branded first screen out. This is a code-w
 1. **Locate the flow.** Find where the email is captured and where the post-signup screen renders. Confirm both files with the user.
 2. **Extract the domain.** Take the part after `@`, lowercase it. Maintain a denylist of free providers (gmail.com, outlook.com, yahoo.com, icloud.com, and similar); denylisted domains skip personalization entirely.
 3. **Fetch server-side.** `GET https://api.brandfetch.io/v2/brands/{domain}` with `Authorization: Bearer <key>`. Timeout at 2 seconds; on timeout or error, render the default flow. Personalization must never block signup.
-4. **Cache.** Store the response by domain (your DB or cache layer, 24h+ TTL). Repeat signups from one company must not spend credits.
+4. **Cache.** Store the response by domain (your DB or cache layer, 24h+ TTL). Repeat signups from one company must not spend credits. Cache "no brand" (404) results too, with a shorter TTL (24h to 7d), so a company with no brand doesn't cost a credit per signup. Don't cache timeouts or 5xx errors, but limit retries, and make concurrent lookups for one domain share a single call (signup and the first screen can race).
 5. **Render.**
-   - Logo: pick `type: "icon"` for avatars, `type: "logo"` for headers, matching the screen's theme (`light`/`dark` variants are in the record).
+   - Logo: pick `type: "icon"` for avatars, `type: "logo"` for headers. `theme` names the logo's own colour, not the screen's: a dark screen takes the `theme: "light"` variant, a light screen the `theme: "dark"` one. Not every record has both (icons are often dark only): fall back to the other variant, then to the lettermark.
    - Colors: the `accent` hex (the brand's primary color) into the accent slots. Check contrast against your background before applying.
    - Name and description: prefill the company profile fields, editable by the user.
 6. **Fallback.** For avatar slots with no asset, use the Logo CDN lettermark: `https://cdn.brandfetch.io/{domain}/fallback/lettermark?c={clientId}` (client ID from the developer dashboard). Otherwise render the default theme.

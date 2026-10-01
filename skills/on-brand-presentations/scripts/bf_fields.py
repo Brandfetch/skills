@@ -2,7 +2,7 @@
 """
 Field mapping and asset selection for {bf:*} slots.
 
-Template-independent: depends only on the get_brand response shape, never on
+Template-independent: depends only on the get_brand_data response shape, never on
 slot geometry. Safe to reuse across any instrumented deck.
 """
 

@@ -38,7 +38,7 @@ DESCRIPTION = (
 
 TEMPLATE_SECTION = """## Template
 
-This skill fills {company}'s template, `assets/template.pptx`, for every deck.
+This skill fills {company}'s template, `<skill-dir>/assets/template.pptx`, for every deck.
 A template `.pptx` attached in the conversation overrides it for that deck;
 a new design only when the user asks for one (`references/from-scratch.md`).
 To change the template, onboard the new deck with the Brandfetch
@@ -57,9 +57,10 @@ def rewrite_skill_md(text, name, company):
     text = re.sub(r"^name: .*$", f"name: {name}", text, count=1, flags=re.M)
     desc = DESCRIPTION.format(company=company)
     text = re.sub(r"^description: .*$", lambda _: f"description: {desc}", text, count=1, flags=re.M)
-    text = re.sub(r"^# Pitch deck generator$", f"# {company} pitch deck", text, count=1, flags=re.M)
+    text = re.sub(r"^# .*$", f"# {company} presentations", text, count=1, flags=re.M)
     text = section(text, "choose-template", TEMPLATE_SECTION.format(company=company))
     text = section(text, "onboarding", "")
+    text = section(text, "which-template", "**Use `<skill-dir>/assets/template.pptx`**, unless a template is\nattached in the conversation. Say which you used.\n")
     return text
 
 

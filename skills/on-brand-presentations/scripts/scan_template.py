@@ -68,9 +68,14 @@ def scan(path):
         key=lambda s: int(re.search(r"\d+", s.rsplit("/", 1)[-1]).group()),
     )
     warnings = []
+    all_tokens = set()
+    placed = []          # pictures the builder already placed: a filled deck
 
     for slide in slides:
         raw = z.read(slide).decode("utf-8", "replace")
+        # build_deck names every picture it places after its slot
+        placed += [(slide.rsplit("/", 1)[-1], n) for n in
+                   re.findall(r'<p:pic>.*?<p:cNvPr[^>]*\bname="(\{bf:[A-Za-z]+\})"', raw, re.S)]
         merged = merge_split_runs(raw)
         name = slide.rsplit("/", 1)[-1]
         bg = slide_background(raw)
@@ -88,6 +93,7 @@ def scan(path):
             body = "".join(re.findall(r"<a:t>(.*?)</a:t>", sp, re.S))
             for tok in GENERIC.findall(body):
                 seen.add(tok)
+                all_tokens.add(tok)
                 frame = geom(sp)
                 if tok in BF.IMAGE_SLOTS and frame:
                     fit, shape = infer_fit(tok, sp, frame)
@@ -106,7 +112,7 @@ def scan(path):
                                 f"let it pick the right variant."
                             )
                 elif tok in BF.TEXT_SLOTS:
-                    print(f"  {tok:28s} text   (from get_brand)")
+                    print(f"  {tok:28s} text   (from get_brand_data)")
                 elif tok.startswith("{bf:") or tok.startswith("{{bf:"):
                     print(f"  {tok:28s} UNKNOWN bf token — will stay unfilled")
                     warnings.append(
@@ -130,6 +136,17 @@ def scan(path):
             warnings.append(f"{name}: unbalanced braces — an unclosed token somewhere")
 
     print()
+    if placed:
+        where = ", ".join(f"{s} {t}" for s, t in placed)
+        warnings.insert(0,
+            f"PARTLY FILLED DECK: the builder already placed {where}. This is a "
+            f"deck made for a client, not a template — every deck built from it "
+            f"keeps that client's logo there. Use the original template, or "
+            f"onboard this deck (instrument_template.py --detect).")
+    if not all_tokens:
+        print("No tokens found: this is not a template. If it is a deck sent to a "
+              "client, onboard it (instrument_template.py --detect).")
+        return 2
     if warnings:
         print(f"{len(warnings)} warning(s):")
         for w in warnings:

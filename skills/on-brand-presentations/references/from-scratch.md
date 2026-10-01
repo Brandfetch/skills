@@ -12,8 +12,8 @@ verified identity. Build it from the brand's record, never from model memory.
 ## Procedure
 
 1. **Resolve the brand.** Domain from the user, or `brand_search` / `GET /v2/search/{name}` for a name; confirm ambiguous matches. Note whether the deck is in the user's own brand or another company's.
-2. **Fetch the kit.** MCP `get_brand` and `get_brand_context` in parallel.
-3. **Get real asset bytes.** Download the asset `src` URLs from the `get_brand` response verbatim — their `?c=` parameter is a per-response credential, so never edit or reuse one from an old response. If the CDN cannot be reached, read the MCP's `bf://asset/{domain}/{type}` resources instead. URLs from `build_logo_urls` are display-only and cannot be downloaded. Prefer SVG, fall back to the largest PNG. Pick `theme` variants to match slide backgrounds: a dark slide takes the `light` logo.
+2. **Fetch the kit.** MCP `get_brand_data` and `get_brand_context` in parallel.
+3. **Get real asset bytes.** Download the asset `src` URLs from the `get_brand_data` response verbatim — their `?c=` parameter is a credential, so never edit or rebuild one. If the CDN cannot be reached, read the MCP's `bf://asset/{domain}/{type}` resources instead. URLs from `build_logo_urls` are display-only and cannot be downloaded. Prefer SVG, fall back to the largest PNG. Pick `theme` variants to match slide backgrounds: a dark slide takes the `light` logo.
 4. **Apply the brand.**
    - Logos: title slide (type `logo`), small footer or corner mark on content slides (type `icon` or `symbol`). Composite the files; never redraw, recolor, stretch, or crop.
    - Colors: `accent` (the brand's primary color), then `brand` colors, for accents, headings, and charts. Backgrounds stay neutral (the brand's `light`/`dark` values) unless the user asks for a full-bleed brand look. Check text contrast on every colored element; fix by switching the text color, not the brand hex.

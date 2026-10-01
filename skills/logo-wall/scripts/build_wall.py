@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build a logo wall — PPTX, PDF, HTML and/or PNG — from saved get_brand responses.
+Build a logo wall — PPTX, PDF, HTML and/or PNG — from saved get_brand_data responses.
 
     python3 build_wall.py wall.json --check     # pick, verify, preview; build nothing
     python3 build_wall.py wall.json             # build every format in "formats"
@@ -16,7 +16,7 @@ wall.json:
   "cols": null,                                // null = derived
   "ink": null,                                 // mono colour override, "#RRGGBB"
   "brands": [
-    "brands/stripe.json",                      // a get_brand response saved verbatim
+    "brands/stripe.json",                      // a get_brand_data response saved verbatim
     {"brand": "brands/slack.json", "accept": true},   // decision on a flag
     {"brand": "brands/figma.json", "drop": true},
     {"brand": "brands/shopify.json", "name": "Shopify"}
@@ -70,7 +70,7 @@ def fetch(url, dest):
     if r.returncode:
         msg = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else f"curl exit {r.returncode}"
         if "403" in msg:
-            msg += " (see setup.md: allowlist, or a stale/edited ?c= credential)"
+            msg += " (see setup.md: allowlist, or an edited ?c= credential)"
         raise RuntimeError(msg)
     return dest
 

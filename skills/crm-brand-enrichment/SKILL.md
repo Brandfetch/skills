@@ -17,7 +17,7 @@ Resolve each company's domain through the Brandfetch Brand API and write brand f
 
 1. **Check quota first (HTTP only).** Call `GET https://api.brandfetch.io/v2/viewer` (free, never consumes credits). Read `x-api-key-quota` and `x-api-key-approximate-usage` headers on responses. If remaining quota is smaller than the record count, tell the user and ask whether to enrich a subset. With the MCP, skip this: it reports an exhausted quota itself.
 2. **Load records.** Identify the domain column or property. Normalize: lowercase, strip scheme, path, and `www.`.
-3. **Resolve each domain.** Use the MCP `get_brand` tool, or `GET https://api.brandfetch.io/v2/brands/{domain}`. Cache results by domain within the run so duplicate domains cost one call.
+3. **Resolve each domain.** Use the MCP `get_brand_data` tool, or `GET https://api.brandfetch.io/v2/brands/{domain}`. Cache results by domain within the run so duplicate domains cost one call.
 4. **No domain? Search first.** Use MCP `brand_search` or `GET /v2/search/{name}`. Accept the top result only if its name closely matches the record. Otherwise list candidates and ask the user. Never guess silently.
 5. **Map fields.**
    - Logo: prefer `type: "icon"` for avatar-sized slots, `type: "logo"` for wide slots. Use the `src` URLs exactly as returned, never edited.
