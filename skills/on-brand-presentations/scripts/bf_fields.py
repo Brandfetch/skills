@@ -2,7 +2,7 @@
 """
 Field mapping and asset selection for {bf:*} slots.
 
-Template-independent: depends only on the get_brand response shape, never on
+Template-independent: depends only on the get_brand_data response shape, never on
 slot geometry. Safe to reuse across any instrumented deck.
 """
 
@@ -107,9 +107,28 @@ def _chain(brand, logo_type, themes):
     return None
 
 
+def bf_logo(brand):
+    """
+    {bf:logo} — the logo, theme chosen at BUILD time from the ground the slot
+    sits on (see THEMED). Resolves here to whichever variant exists, so a
+    brand with no logo at all is still reported missing.
+    """
+    return _chain(brand, "logo", ["light", "dark"])
+
+
+def bf_symbol(brand):
+    """{bf:symbol} — the symbol, theme chosen at build time like {bf:logo}."""
+    return _chain(brand, "symbol", ["light", "dark"])
+
+
 def bf_light_or_dark_logo(brand):
     """{bf:lightOrDarkLogo} — logo, light preferred, dark as fallback."""
     return _chain(brand, "logo", ["light", "dark"])
+
+
+def bf_dark_or_light_logo(brand):
+    """{bf:darkOrLightLogo} — logo, dark preferred, light as fallback."""
+    return _chain(brand, "logo", ["dark", "light"])
 
 
 def bf_dark_or_light_symbol(brand):
@@ -160,26 +179,114 @@ TEXT_SLOTS = {
 IMAGE_SLOTS = {
     "{bf:banner}": (bf_banner, "cover"),
     "{bf:icon}": (bf_icon, "cover"),
+    "{bf:logo}": (bf_logo, "contain"),
+    "{bf:symbol}": (bf_symbol, "contain"),
     "{bf:lightOrDarkLogo}": (bf_light_or_dark_logo, "contain"),
+    "{bf:darkOrLightLogo}": (bf_dark_or_light_logo, "contain"),
     "{bf:darkOrLightSymbol}": (bf_dark_or_light_symbol, "contain"),
     "{bf:lightOrDarkSymbol}": (bf_light_or_dark_symbol, "contain"),
 }
 
 
-def resolve(brand):
+# Slots whose light/dark variant the builder picks per slot, by measuring
+# which one is actually visible on the colour underneath it.
+#   (logo type, preferred theme) — None means "whichever the ground calls for".
+# The chain tokens only set the order tried; a variant that would vanish on
+# its ground is never placed, whatever the token asked for.
+THEMED = {
+    "{bf:logo}": ("logo", None),
+    "{bf:symbol}": ("symbol", None),
+    "{bf:lightOrDarkLogo}": ("logo", "light"),
+    "{bf:darkOrLightLogo}": ("logo", "dark"),
+    "{bf:lightOrDarkSymbol}": ("symbol", "light"),
+    "{bf:darkOrLightSymbol}": ("symbol", "dark"),
+}
+
+
+def theme_variants(brand, logo_type):
+    """{theme: format entry} for every theme this logo type exists in."""
+    out = {}
+    for theme in ("light", "dark"):
+        hit = _find_logo(brand, logo_type, theme)
+        if hit:
+            out[theme] = hit
+    return out
+
+
+LOGO_TYPES = ("logo", "symbol", "icon")
+
+
+def parse_use(arg):
+    """'symbol:icon,logo:symbol' -> {'symbol': 'icon', 'logo': 'symbol'}"""
+    out = {}
+    for pair in filter(None, (arg or "").split(",")):
+        want, _, alt = pair.partition(":")
+        if want not in LOGO_TYPES or alt not in LOGO_TYPES or want == alt:
+            raise SystemExit(f"--use takes type:type pairs of {LOGO_TYPES}, got {pair!r}")
+        out[want] = alt
+    return out
+
+
+def missing_hint(brand, missing):
+    """The question to ask the user about each logo type this brand lacks."""
+    lacking = sorted({slot_type(s) for s in missing if slot_type(s)})
+    have = available_types(brand)
+    name = brand.get("name") or brand.get("domain") or "This brand"
+    lines = []
+    for t in lacking:
+        others = [o for o in have if o != t]
+        if others:
+            lines.append(f"  ASK THE USER: {name} has no {t}. Use its {' or its '.join(others)} "
+                         f"there? Then rebuild with --use={t}:{others[0]} (or :{others[-1]}).")
+        else:
+            lines.append(f"  {name} has no {t} and no other logo type: the slot stays empty.")
+    return "\n".join(lines)
+
+
+def slot_type(slot):
+    """The logo type a slot asks for: logo, symbol, icon — or None (banner)."""
+    if slot in THEMED:
+        return THEMED[slot][0]
+    return "icon" if slot == "{bf:icon}" else None
+
+
+def available_types(brand):
+    """Logo types this brand has at least one usable asset for."""
+    return [t for t in LOGO_TYPES if theme_variants(brand, t)]
+
+
+def resolve(brand, use=None):
     """
     Resolve every slot. Returns (text, images, missing).
 
     `missing` lists slots with no source asset — those are left empty and
-    reported, never substituted.
+    reported. They are never substituted on the builder's own initiative:
+    `use` ({"symbol": "icon"}) is the user's answer to "this brand has no
+    symbol — use its icon or its logo there?", and only then does a slot take
+    another type.
     """
+    use = use or {}
     text = {slot: fn(brand) for slot, fn in TEXT_SLOTS.items()}
     images, missing = {}, []
 
     for slot, (fn, fit) in IMAGE_SLOTS.items():
         hit = fn(brand)
+        typ = slot_type(slot)
         if hit:
             images[slot] = {"src": hit["src"], "format": hit["format"], "fit": fit}
+            if slot in THEMED:
+                images[slot]["variants"] = theme_variants(brand, typ)
+            continue
+        alt = use.get(typ)
+        variants = theme_variants(brand, alt) if alt in LOGO_TYPES else {}
+        if variants:
+            first = next(iter(variants.values()))
+            # a wordmark or symbol in an icon's cover-fit slot would be cropped
+            images[slot] = {"src": first["src"], "format": first["format"],
+                            "fit": "contain" if alt != "icon" else fit,
+                            "type": alt, "instead_of": typ}
+            if slot in THEMED:
+                images[slot]["variants"] = variants
         else:
             missing.append(slot)
 
@@ -190,10 +297,14 @@ def resolve(brand):
 if __name__ == "__main__":
     import json, sys
 
-    brand = json.load(open(sys.argv[1] if len(sys.argv) > 1 else "brand.json"))
-    text, images, missing = resolve(brand)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    use = parse_use(next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--use=")), ""))
+    brand = json.load(open(args[0] if args else "brand.json"))
+    text, images, missing = resolve(brand, use)
     for k, v in text.items():
         print(f"{k:26s} {v!r}")
     for k, v in images.items():
-        print(f"{k:26s} [{v['fit']:7s}] {v['format']:4s} {v['src'][:72]}")
+        sub = f"  ({v['type']} instead of {v['instead_of']})" if "instead_of" in v else ""
+        print(f"{k:26s} [{v['fit']:7s}] {v['format']:4s} {v['src'][:72]}{sub}")
     print(f"\nmissing: {missing or 'none'}")
+    print(missing_hint(brand, missing))

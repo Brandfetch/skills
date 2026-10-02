@@ -1,121 +1,134 @@
 ---
 name: logo-wall
-description: Generate a customer or partner logo-wall slide (editable PPTX) from a list of brands, pulling verified logos from the Brandfetch MCP. Use this whenever the user asks for a logo wall, logo grid, customer wall, "trusted by" slide, social-proof slide, or a slide showing many company logos — "make a logo wall of our 12 customers", "a trusted-by slide with these brands". For a full personalized deck for ONE client, use the pitch-deck-generator skill instead.
+description: Generate a customer or partner logo wall — as PPTX, PDF, HTML or PNG — from a list of brands, with verified logos from the Brandfetch MCP, optically balanced so no logo looks bigger or smaller than the rest. Use this whenever the user asks for a logo wall, logo grid, logo strip, customer wall, "trusted by" or "as seen in" section, social-proof slide, or any slide or web section showing many company logos — "make a logo wall of our 12 customers", "a trusted-by slide with these brands", "put these logos on a dark background". For a full personalized deck for ONE client, use the on-brand-presentations skill instead.
 license: MIT
 ---
 
 # Logo wall
 
-Builds one slide: a grid of brand logos, sized and verified to read as a
-designed set. Output is a real editable `.pptx` — every logo is a separate
-picture the user can move or swap.
+One wall of brand logos that reads as a designed set: same visual weight,
+same colour treatment, even rhythm. Every logo stays a separate object — a
+movable picture in PowerPoint, its own image in the PDF, an `<img>` in the
+HTML.
 
-**Requirements:** the Brandfetch MCP connected, and `cdn.brandfetch.io` on
-the network allowlist (see `references/setup.md`).
+**Requirements:** the Brandfetch MCP connected, `cdn.brandfetch.io` on the
+network allowlist, and Pillow (see `references/setup.md`). No other Python
+packages: PPTX and PDF are written directly.
 
-## Ask these four things first
+## 1. Ask before fetching anything
 
-Do not fetch anything before the answers are clear. Read the conversation
-first — some may already be answered.
+Read the conversation first; ask only what is still open, in one message,
+with the defaults stated so the user can just say "yes":
 
-1. **Which brands?** Domains preferred (`stripe.com`); names are fine, resolve
-   ambiguous ones via `brand_search` and confirm the match.
-2. **Dark or light slide background?** (Default: dark.) This decides which
-   theme variant to fetch — the user should never need to know that
-   `theme=light` means a white mark.
-3. **Which asset type?** Explain briefly:
-   - **logo** — full wordmark, most recognisable. Default.
-   - **symbol** — mark only, most visually uniform grid.
-   - **icon** — app-tile style; usually JPEG with a baked-in background that
-     shows as a tile on the slide. Discourage unless asked for.
-4. **Monochrome or original brand colours?** (Default: monochrome on dark.)
+| Question | Options | Default |
+|---|---|---|
+| **Format** | PPTX (slide) · PDF · HTML (web section) · PNG — several is fine | PPTX |
+| **Which brands, how many** | a list of domains or names; if they say "our top 12 customers", ask for the list | — |
+| **Background** | dark · light · a hex colour (their slide or site colour) | dark |
+| **Style** | monochrome (one colour, the classic wall) · original brand colours | monochrome |
+| **Logo type** | wordmark (most recognisable) · symbol (most uniform, for brands everyone knows) | wordmark |
+| **Title** | e.g. "Trusted by teams everywhere", or none | none |
 
-The **grid is derived, not asked**: 12 brands → 4×3. Propose it in the
-confirm step and accept an override; never make the user do layout math.
+Always ask **Format**, even when the request implies one ("a trusted-by
+slide"): offer the implied format as the default and list the others — most
+users don't know PDF, HTML and PNG are possible.
 
-## The rule this skill exists for
+Never ask for a grid: it is derived (10 → 5×2, 7 → 4+3 centred). Propose it
+in the check step; accept an override (`"cols"`).
 
-**The `theme` label does not guarantee monochrome — only pixels do.**
+Past ~20 logos a single wall stops being scannable — suggest the strongest
+12–16, or two walls.
 
-Official light-theme variants frequently keep a coloured symbol (that IS the
-brand's approved light-background version), and the true all-white variant,
-when it exists, is often filed under `type: "other"` with no semantic label.
-So when the user wants monochrome:
+## 2. Resolve every brand and save it
 
-1. Collect candidates per brand from `get_brand`: the theme-matched primary
-   first, then every same-theme variant under `type: "other"`.
-2. The builder downloads candidates in order and keeps the first that passes
-   a pixel saturation check.
-3. No candidate passes → the brand is **flagged**, never silently shipped and
-   **never force-tinted** — recolouring a brand's mark violates its
-   guidelines. The user chooses: accept the least-coloured candidate, switch
-   that brand to its symbol, or drop it.
+Call `get_brand_data` per domain (resolve names with `brand_search` first and
+confirm ambiguous matches). Save each response **verbatim** to
+`brands/<domain>.json` — the script reads the logo variants from disk and
+picks between them itself. Never copy URLs into a config by hand: the `?c=`
+parameter is a credential that breaks when edited, and hand-picked variants skip the
+pixel checks below.
 
-## Workflow
+Note the name the API returns. A surprising one (a parent brand, a
+co-branded lockup, "Shopify.com") is a check-step item, not an error.
 
-### 1. Resolve every brand
-
-`get_brand` per domain. From each response collect, in order, the candidate
-`src` URLs for the chosen type and theme — primary first, then `type:"other"`
-same-theme variants. Also note the brand **name the API returns**: wrong or
-surprising matches (a subsidiary, a post-acquisition lockup like an acquired
-company shown under its parent's brand) are confirm-step items, not errors.
-
-### 2. Write `wall.json`
+## 3. Write `wall.json` and check
 
 ```json
 {
   "title": "Trusted by teams everywhere",
   "background": "dark",
-  "mono": true,
-  "brands": [
-    { "name": "Slack", "candidates": ["<primary src URL>", "<other-type URL>"] }
-  ]
+  "style": "mono",
+  "type": "logo",
+  "formats": ["pptx"],
+  "out": "logo-wall",
+  "brands": ["brands/stripe.com.json", "brands/slack.com.json"]
 }
 ```
 
-Use `src` URLs **verbatim** — the `?c=` parameter is a per-response
-credential (see `references/setup.md`).
-
-### 3. Check, then confirm
+`"style"` is `"mono"` (one colour) or `"color"` (original brand colours);
+`"type"` is `"logo"` (wordmark) or `"symbol"`. Anything else is refused.
 
 ```bash
 python3 scripts/build_wall.py wall.json --check
 ```
 
-Downloads and pixel-verifies everything, prints the resolved count, the
-derived grid, and every flag — builds nothing. Show this to the user and get
-their decision on each flag. This step is not optional: flags are human
-decisions.
+This downloads every candidate variant, chooses one per brand from its
+pixels, lays out the wall and writes `logo-wall.preview.png` — without
+building the deliverable. **Look at the preview, then show it to the user**
+with the report. Every `!` line is a decision for the user:
 
-### 4. Build and verify
+- **flattened from colour, colour carries N% of its drawing** — no official
+  one-colour version exists and flattening merges parts of the mark
+  (Mastercard's overlap, Figma's lobes). Options: accept, drop the brand, or
+  switch this wall to original colours.
+- **no usable asset** — the brand has no logo of that type (many have no
+  symbol). Drop it, or use wordmarks for the whole wall.
+- **not visible in colour** — neither variant shows on this background.
+
+Record the answer on the brand's entry — `{"brand": "…", "accept": true}` or
+`{"brand": "…", "drop": true}`. The build refuses to run while a flag is
+undecided. `i` lines are information worth one sentence to the user (a
+two-line lockup like "slack / from Salesforce", an odd API name — fix with
+`"name": "Shopify"`).
+
+## 4. Build and look
 
 ```bash
-python3 scripts/build_wall.py wall.json wall.pptx
+python3 scripts/build_wall.py wall.json
 ```
 
-Then validate and render, and actually look at it:
+Writes every format in `formats`, plus a fresh preview. Look at the preview
+again before handing anything over: a wrong-brand logo or an off mark is
+obvious to the eye and invisible to the report.
 
-```bash
-python3 <pptx-skill>/scripts/office/validate.py wall.pptx
-```
+## What the script decides, so you can explain it
 
-Check for: a wrong-brand logo the confirm step missed, one mark visually
-dominating (the clamp bounds this but taste beats math), and lettermark
-placeholders where a brand had no real asset.
+**Which variant.** Monochrome: an official one-colour version in the right
+colour first; then an official one-colour version recoloured (lossless);
+only then a colour logo flattened. Original colours: the variant that is
+actually visible on the background, measured, not assumed from its label.
+An unlabelled `type: "other"` variant often holds the real all-white logo,
+so those are considered too.
 
-## How sizing works (so you can explain it)
+**How flattening works.** A luminance threshold (`references/monochrome.md`):
+ink becomes the wall's colour, near-white becomes transparent. Knocked-out
+detail — Notion's cube face, the counters of letters — stays a hole instead
+of filling in, which is what a plain "make it white" does. Every mono mark,
+official or flattened, is re-rendered in one exact colour. Nothing is ever
+tinted a colour the brand did not choose.
 
-Each logo is contained into an equal cell at its natural size, then heights
-are **clamped to a band around the median** (0.72×–1.25×). Natural sizing is
-what makes a wall look organic rather than templated; the clamp is what stops
-one square symbol or skyscraper glyph from wrecking it. Logos are never
-stretched, cropped, or recoloured. A partial last row is centred.
+**How sizing works.** Each logo is trimmed to its ink (files carry anything
+from no padding — Stripe — to huge margins), then sized to equal visual
+area, nudged for stroke weight (a heavy mark reads bigger), guarded so
+extreme shapes stay sane, and centred on its optical centre rather than its
+box. Details and the reasoning: `references/rules.md`.
 
 ## Files
 
-- `scripts/build_wall.py` — verify + clamp + grid + PPTX. `--check` for the
-  confirm report.
-- `references/rules.md` — the verification and layout rules, with the cases
-  that produced them.
+- `scripts/build_wall.py` — choose variants, report, build. `--check` first.
+- `scripts/ink.py` — loading (SVG included), monochrome, measurements.
+- `scripts/layout.py` — grid, optical sizing and centring.
+- `scripts/writers.py` — PPTX, PDF, HTML, PNG from one layout.
+- `references/rules.md` — every rule, with the wall that produced it.
+- `references/monochrome.md` — the flattening filter, and its CSS form.
 - `references/setup.md` — MCP, allowlist, dependencies.

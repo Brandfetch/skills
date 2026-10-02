@@ -6,4 +6,17 @@ brand.json
 values.json
 wall.json
 *.pptx
-!skills/pitch-deck-generator/assets/template.pptx
+# Decks, documents and exports: none belong in this repo
+*.ppt
+*.potx
+*.key
+*.odp
+*.pdf
+*.docx
+*.zip
+proposal.json
+mapping.json
+previews/
+brands/
+wall_assets/
+logo-wall.*

@@ -1,32 +1,39 @@
 # Brandfetch skills
 
-Agent skills powered by the [Brandfetch](https://brandfetch.com) MCP, packaged
-as the official Brandfetch plugin for Claude Code and claude.ai. The plugin
-bundles two things:
+The official [Brandfetch](https://brandfetch.com) plugin for Claude Code and
+claude.ai. It bundles the **Brandfetch MCP server** (search 50M+ brands and
+get their logos, colors, fonts, company data and brand context) with
+**skills** that turn that data into finished work.
 
-1. **The Brandfetch MCP server** — search 50M+ brands and retrieve logos,
-   icons, colors, fonts, company data and LLM-ready brand context.
-2. **Skills** that turn that data into finished, on-brand deliverables.
+## Skills
 
-| Skill | What it does | Try |
-|---|---|---|
-| [`pitch-deck-generator`](skills/pitch-deck-generator/) | Fill **your own** PPTX template with a client's brand data and your deal values | *"Make a proposal deck for stripe.com"* |
-| [`logo-wall`](skills/logo-wall/) | A "trusted by" slide from a list of brands — grid derived, logos pixel-verified monochrome | *"Logo wall of our 12 customers, white on dark"* |
+**Deliverables**
 
-![Deck cover example](docs/deck-example.jpg)
-![Logo wall example](docs/wall-example.jpg)
+- [`on-brand-presentations`](skills/on-brand-presentations/): a deck for a company, from your own template or designed from scratch in their brand.
+- [`logo-wall`](skills/logo-wall/): a "trusted by" logo wall as PPTX, PDF, HTML or PNG.
+- [`prospect-branded-pages`](skills/prospect-branded-pages/): landing pages and one-pagers themed in a prospect's brand.
+- [`ai-brand-kit`](skills/ai-brand-kit/): a verified brand kit for image, video or copy models.
+- [`pre-call-brand-brief`](skills/pre-call-brand-brief/): a one-page brief on a company before a meeting.
+- [`brand-check`](skills/brand-check/): an audit of a deck, PDF or page against a brand's verified assets.
+
+**Data enrichment**
+
+- [`crm-brand-enrichment`](skills/crm-brand-enrichment/): logos and firmographics for CRM records, CSVs and sheets.
+- [`transaction-enrichment-test`](skills/transaction-enrichment-test/): merchants behind card and bank descriptors, with a match-rate report.
+- [`ticker-logos`](skills/ticker-logos/): logos and brand data from tickers, ISINs and crypto symbols.
+
+**Code for your product**
+
+- [`company-autocomplete`](skills/company-autocomplete/): a company-name typeahead for signup forms.
+- [`onboarding-brand-prefill`](skills/onboarding-brand-prefill/): a branded first screen from a new user's work email.
+- [`real-logos-migration`](skills/real-logos-migration/): replace favicons and Clearbit logo URLs with the Logo API.
+
+Skills load automatically when a request calls for them, or by name as
+`/brandfetch:<skill>`. Each skill's folder documents how it works.
 
 ## Install
 
 ### Claude Code
-
-From the official plugin directory (once listed):
-
-```
-/plugin install brandfetch
-```
-
-Or straight from this repository:
 
 ```
 /plugin marketplace add Brandfetch/skills
@@ -34,75 +41,40 @@ Or straight from this repository:
 ```
 
 The first time a Brandfetch tool is used, Claude Code opens the Brandfetch
-OAuth flow in your browser. Alternatively, generate a `bf1.` MCP token from
-**Keys and MCP** in the [Brandfetch dashboard](https://developers.brandfetch.com)
-and connect the server manually with an `Authorization: Bearer` header — see the
-[MCP docs](https://docs.brandfetch.com/mcp/overview).
-
-Skills are invoked as `/brandfetch:pitch-deck-generator` and
-`/brandfetch:logo-wall`, or automatically when the conversation calls for them.
+sign-in in your browser. You can instead connect with a `bf1.` MCP token from
+**Keys and MCP** in the [Brandfetch dashboard](https://developers.brandfetch.com);
+see the [MCP docs](https://docs.brandfetch.com/mcp/overview).
 
 ### claude.ai
 
-Add **Brandfetch** from the connector directory (Settings → Connectors), then
-add the skills you want from **Settings → Capabilities → Skills** by uploading
-a zip of the skill folder. Team and Enterprise admins can instead distribute
-this plugin to the whole organization from **Organization settings → Plugins**.
+**As a plugin (recommended).** It installs the MCP server and every skill at
+once. Go to **Connectors → Plugins → Add marketplace** and paste
+`https://github.com/Brandfetch/skills`. Once Brandfetch is listed in the
+plugin marketplace, you can also find it there. Team and Enterprise admins can
+distribute the plugin to the whole organization from
+**Organization settings → Plugins**.
+
+**Skill by skill.** Add **Brandfetch** from the connector directory
+(**Settings → Connectors**), then upload the skills you want as zips of their
+folders in **Settings → Capabilities → Skills**.
 
 ### Claude API
 
-Upload a skill folder via the [Skills API](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
-(`/v1/skills`); requires the code execution tool.
+Upload a skill folder with the [Skills API](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
+(`/v1/skills`). Skills need the code execution tool.
 
 ## Requirements
 
-- A Brandfetch account (free tier works) for the MCP server.
-- **`cdn.brandfetch.io`** on your environment's network allowlist — the skills
-  download logo files with `curl`. Allowlist changes apply to **new**
-  conversations only.
-- Python with `Pillow`; `python-pptx` for the logo wall.
+- A Brandfetch account. The free plan works.
+- **`*.brandfetch.io`** on your environment's network allowlist: `cdn` for
+  skills that download logo files, `api` for skills that call the Brandfetch
+  API directly. Allowlist changes apply to new conversations only.
+- Some code and enrichment skills call the Brandfetch API directly. They ask
+  for an API key or client ID from the [developer dashboard](https://developers.brandfetch.com).
 
-Each skill's `references/setup.md` covers the setup traps in detail,
-including the three different failures that all look like a 403.
+## Contributing
 
-## How the skills work
-
-Both skills follow the same contract:
-
-- **Two token namespaces.** `{bf:*}` tokens resolve automatically from the
-  Brandfetch API (`{bf:name}`, `{bf:lightOrDarkLogo}`, …). Every other
-  `{token}` is yours — named after whatever your business sells, supplied at
-  build time, **never guessed**.
-- **Never invent a fact.** Every value on a slide comes from the API or from
-  the conversation. Missing data stays visibly missing.
-- **Verify pixels, not metadata.** Logo theme labels don't guarantee a
-  monochrome mark; the skills check the actual pixels and hunt alternate
-  variants when they fail.
-- **The output is real PowerPoint.** Every logo is a separate, movable
-  picture. No rasterised slides.
-
-## Make it yours
-
-The deck skill is built to be forked. The bundled `assets/template.pptx` is a
-reference showing where tokens go — replace it with **your** deck:
-
-1. Type tokens as visible text in your own template
-   (`{bf:name}`, `{bf:lightOrDarkLogo}`, `{your_own_fields}`).
-2. `python3 scripts/scan_template.py your-template.pptx` — fix every warning.
-3. Build. Nothing about your template's layout is hardcoded.
-
-Full guide: [`skills/pitch-deck-generator/references/template-guide.md`](skills/pitch-deck-generator/references/template-guide.md).
-
-## Repository layout
-
-```
-.claude-plugin/plugin.json        plugin manifest
-.claude-plugin/marketplace.json   lets `/plugin marketplace add Brandfetch/skills` work
-.mcp.json                         the hosted Brandfetch MCP server
-skills/pitch-deck-generator/      SKILL.md · assets/template.pptx · scripts/ · references/
-skills/logo-wall/                 SKILL.md · scripts/ · references/
-docs/                             example renders
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Links
 
@@ -112,4 +84,4 @@ docs/                             example renders
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

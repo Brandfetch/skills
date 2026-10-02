@@ -4,7 +4,7 @@ Two of these steps fail in non-obvious ways when skipped. Do them in order.
 
 ## 1. Connect the Brandfetch MCP
 
-The skill's brand data comes from the Brandfetch MCP (`get_brand`). Connect
+The skill's brand data comes from the Brandfetch MCP (`get_brand_data`). Connect
 it from the connector directory, or add it manually:
 `https://mcp.brandfetch.io/mcp`.
 
@@ -20,24 +20,24 @@ Two traps, both learned the slow way:
 
 - **The allowlist is read at conversation start.** A change does not apply to
   the conversation you made it from — open a new chat and test again there.
-- **A 403 is not always the network.** An expired or edited `?c=` credential
-  on the URL also surfaces as a 403 (see `troubleshooting.md`). Test with a
-  fresh URL from a fresh `get_brand` call before concluding the allowlist is
-  wrong.
+- **A 403 is not always the network.** An edited `?c=` credential on the URL
+  also surfaces as a 403 (see `troubleshooting.md`). Test with a `src` URL
+  copied verbatim from a `get_brand_data` response before concluding the
+  allowlist is wrong.
 
 Quick test once configured:
 
 ```bash
-curl -sS -o /tmp/t.png "<any src URL from a fresh get_brand response>" \
+curl -sS -o /tmp/t.png "<any src URL from a get_brand_data response>" \
   && python3 -c "from PIL import Image; print(Image.open('/tmp/t.png').size)"
 ```
 
 ## 3. Fonts (optional, but read this)
 
-The bundled template uses **Arial** with generous frame slack, so it renders
-acceptably with no fonts installed at all — that is deliberate.
+A template in an Office font (**Arial**, Calibri…) with generous frame slack
+renders acceptably with no fonts installed at all.
 
-If your own template uses other fonts, install them in the render environment
+If your template uses other fonts, install them in the render environment
 before trusting any preview: LibreOffice substitutes missing fonts with
 different widths, and text then *appears* to overflow when it does not
 (rules.md #8). Check with:
@@ -66,10 +66,12 @@ WebP-only variants: convert with Pillow (`Image.open('x.webp').save('x.png')`)
 ## 5. Verify the loop once
 
 ```bash
-python3 scripts/scan_template.py assets/template.pptx     # should report no warnings
-# get_brand for any well-known domain → save verbatim as brand.json
-python3 scripts/bf_fields.py brand.json                   # preview resolution
-python3 scripts/build_deck.py assets/template.pptx brand.json out.pptx
+# get_brand_data for any well-known domain → save verbatim as brand.json
+python3 <skill-dir>/scripts/bf_fields.py brand.json                   # preview resolution
+python3 <skill-dir>/scripts/scan_template.py template.pptx            # the user's template: no warnings
+python3 <skill-dir>/scripts/build_deck.py template.pptx brand.json out.pptx
 ```
 
-If all three run clean, the environment is ready.
+If all three run clean, the environment is ready. No template yet? The
+first `bf_fields.py` line alone proves the MCP and the data; onboarding
+exercises the rest.

@@ -6,9 +6,9 @@ to get "simplified" away by whoever reads it next.
 
 ## 1. Never invent a fact
 
-Every value comes from `get_brand` or from the conversation. No third source.
+Every value comes from `get_brand_data` or from the conversation. No third source.
 
-> `get_brand` returned `employees: 10001`. The slide shipped "33,000+
+> `get_brand_data` returned `employees: 10001`. The slide shipped "33,000+
 > employees", recalled from an AI model's training data. Plausible,
 > fabricated, and invisible to a proofreader.
 
@@ -18,9 +18,9 @@ never carry a value over from a different client's deck.
 
 ## 2. Fetch assets by direct download of the `src` URLs
 
-Use the `src` URLs from `get_brand` **exactly as returned** — `curl` them to
-disk. The `?c=` query parameter is a per-response credential; editing or
-rebuilding the URL breaks it.
+Use the `src` URLs from `get_brand_data` **exactly as returned** — `curl` them to
+disk. The `?c=` query parameter is a credential; editing or rebuilding the
+URL breaks it. It does not expire, so a saved `src` URL keeps working.
 
 - `build_logo_urls` output is display-only. Fetching it programmatically 302s
   to a hotlink-policy page.
@@ -42,8 +42,18 @@ Verified empirically: `theme=light` is a white mark (for dark grounds),
 > so it would only surface on a monochrome client, exactly when nobody is
 > looking.
 
-Fallback chains never cross type: no symbol at either theme leaves the slot
-empty rather than borrowing the icon.
+So the theme is chosen per slot at build time, by pixels: the builder
+measures each variant against the colour under that slot (≥50% of the
+mark's opaque pixels at ≥1.5:1 contrast) and places the first that passes.
+The label alone is not enough — "dark" variants are often coloured and read
+fine on a dark-grey card, while a black one vanishes.
+
+> A 2:1 bar rejected Spotify's green symbol on an off-white tile (1.6:1),
+> which reads perfectly well. The failures the check exists for sit near
+> 1:1 — white on off-white ~1.15, black on near-black ~1.1.
+
+Nothing visible → the slot stays empty with its dashed box. Fallback never
+crosses type: no symbol at either theme never borrows the icon.
 
 ## 4. Overlay slots, never replace them
 
