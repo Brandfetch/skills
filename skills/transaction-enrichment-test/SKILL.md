@@ -17,14 +17,14 @@ Resolve raw payment descriptors to merchants and report the match rate honestly.
 
 1. **Load and normalize.** Read the CSV/Excel. Trim whitespace. Deduplicate by normalized descriptor text and country; enrich each unique pair once.
 2. **Resolve each unique descriptor.** MCP `enrich_transaction` with `transaction_label` and `country_code`, or the HTTP endpoint. Cache results by normalized descriptor within the run.
-3. **Write the enriched file** with added columns: merchant name, domain, industry, icon URL, resolution status.
-   - Resolved: fill all columns from the response.
+3. **Write the enriched file** with added columns: merchant name, domain, industry (the most specific entry in `company.industries` (the first with a non-null `parent`), else the first entry), icon URL, resolution status.
+   - Resolved: fill all columns from the response. Resolved merchants can have empty company fields; leave those blank.
    - Unresolved: keep the raw descriptor, mark status `unresolved`, leave merchant columns empty. Never substitute a guess.
 4. **Report.**
    - Match rate: resolved / total unique descriptors, and the same weighted by row count.
    - Logo rate: share of resolved merchants with an icon or logo asset.
    - The 10 hardest lines: unresolved descriptors, for human review.
-5. **Sample check.** Show the user 5 random resolved rows for spot verification before declaring the run done.
+5. **Sample check.** Show the user up to 5 random resolved rows for spot verification before declaring the run done.
 
 ## Rules
 

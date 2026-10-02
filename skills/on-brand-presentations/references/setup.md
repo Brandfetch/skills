@@ -34,10 +34,10 @@ curl -sS -o /tmp/t.png "<any src URL from a get_brand_data response>" \
 
 ## 3. Fonts (optional, but read this)
 
-The bundled template uses **Arial** with generous frame slack, so it renders
-acceptably with no fonts installed at all — that is deliberate.
+A template in an Office font (**Arial**, Calibri…) with generous frame slack
+renders acceptably with no fonts installed at all.
 
-If your own template uses other fonts, install them in the render environment
+If your template uses other fonts, install them in the render environment
 before trusting any preview: LibreOffice substitutes missing fonts with
 different widths, and text then *appears* to overflow when it does not
 (rules.md #8). Check with:

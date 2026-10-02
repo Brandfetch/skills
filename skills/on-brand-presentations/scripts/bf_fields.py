@@ -213,22 +213,80 @@ def theme_variants(brand, logo_type):
     return out
 
 
-def resolve(brand):
+LOGO_TYPES = ("logo", "symbol", "icon")
+
+
+def parse_use(arg):
+    """'symbol:icon,logo:symbol' -> {'symbol': 'icon', 'logo': 'symbol'}"""
+    out = {}
+    for pair in filter(None, (arg or "").split(",")):
+        want, _, alt = pair.partition(":")
+        if want not in LOGO_TYPES or alt not in LOGO_TYPES or want == alt:
+            raise SystemExit(f"--use takes type:type pairs of {LOGO_TYPES}, got {pair!r}")
+        out[want] = alt
+    return out
+
+
+def missing_hint(brand, missing):
+    """The question to ask the user about each logo type this brand lacks."""
+    lacking = sorted({slot_type(s) for s in missing if slot_type(s)})
+    have = available_types(brand)
+    name = brand.get("name") or brand.get("domain") or "This brand"
+    lines = []
+    for t in lacking:
+        others = [o for o in have if o != t]
+        if others:
+            lines.append(f"  ASK THE USER: {name} has no {t}. Use its {' or its '.join(others)} "
+                         f"there? Then rebuild with --use={t}:{others[0]} (or :{others[-1]}).")
+        else:
+            lines.append(f"  {name} has no {t} and no other logo type: the slot stays empty.")
+    return "\n".join(lines)
+
+
+def slot_type(slot):
+    """The logo type a slot asks for: logo, symbol, icon — or None (banner)."""
+    if slot in THEMED:
+        return THEMED[slot][0]
+    return "icon" if slot == "{bf:icon}" else None
+
+
+def available_types(brand):
+    """Logo types this brand has at least one usable asset for."""
+    return [t for t in LOGO_TYPES if theme_variants(brand, t)]
+
+
+def resolve(brand, use=None):
     """
     Resolve every slot. Returns (text, images, missing).
 
     `missing` lists slots with no source asset — those are left empty and
-    reported, never substituted.
+    reported. They are never substituted on the builder's own initiative:
+    `use` ({"symbol": "icon"}) is the user's answer to "this brand has no
+    symbol — use its icon or its logo there?", and only then does a slot take
+    another type.
     """
+    use = use or {}
     text = {slot: fn(brand) for slot, fn in TEXT_SLOTS.items()}
     images, missing = {}, []
 
     for slot, (fn, fit) in IMAGE_SLOTS.items():
         hit = fn(brand)
+        typ = slot_type(slot)
         if hit:
             images[slot] = {"src": hit["src"], "format": hit["format"], "fit": fit}
             if slot in THEMED:
-                images[slot]["variants"] = theme_variants(brand, THEMED[slot][0])
+                images[slot]["variants"] = theme_variants(brand, typ)
+            continue
+        alt = use.get(typ)
+        variants = theme_variants(brand, alt) if alt in LOGO_TYPES else {}
+        if variants:
+            first = next(iter(variants.values()))
+            # a wordmark or symbol in an icon's cover-fit slot would be cropped
+            images[slot] = {"src": first["src"], "format": first["format"],
+                            "fit": "contain" if alt != "icon" else fit,
+                            "type": alt, "instead_of": typ}
+            if slot in THEMED:
+                images[slot]["variants"] = variants
         else:
             missing.append(slot)
 
@@ -239,10 +297,14 @@ def resolve(brand):
 if __name__ == "__main__":
     import json, sys
 
-    brand = json.load(open(sys.argv[1] if len(sys.argv) > 1 else "brand.json"))
-    text, images, missing = resolve(brand)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    use = parse_use(next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--use=")), ""))
+    brand = json.load(open(args[0] if args else "brand.json"))
+    text, images, missing = resolve(brand, use)
     for k, v in text.items():
         print(f"{k:26s} {v!r}")
     for k, v in images.items():
-        print(f"{k:26s} [{v['fit']:7s}] {v['format']:4s} {v['src'][:72]}")
+        sub = f"  ({v['type']} instead of {v['instead_of']})" if "instead_of" in v else ""
+        print(f"{k:26s} [{v['fit']:7s}] {v['format']:4s} {v['src'][:72]}{sub}")
     print(f"\nmissing: {missing or 'none'}")
+    print(missing_hint(brand, missing))

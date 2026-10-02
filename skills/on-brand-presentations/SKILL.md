@@ -194,7 +194,7 @@ Tell them, once, in plain words:
 - Turn off the Brandfetch on-brand-presentations skill once theirs is
   installed — both answer "make a deck".
 - Their copy does not receive Brandfetch updates. To pick up a new release,
-  onboard again with it and repackage.
+  onboard again with it and repackage (`package_skill.py … --replace`).
 - On Team or Enterprise, an admin can give the zip to the whole
   organization.
 
@@ -244,6 +244,15 @@ genuinely not have a fee yet. The token stays visible in the output.
 Show the resolved brand fields and the user values together, and wait. This
 is the cheapest place to catch a wrong employee band or a misheard fee.
 
+**A missing logo type is a question, not a gap.** When `bf_fields.py` (or the
+build) prints `ASK THE USER`, the brand lacks a logo type the template uses.
+Ask in the same message, offering only the types it has:
+
+> Stripe has no symbol. Should I use its icon or its logo there?
+
+Then build with their answer, `--use=symbol:icon` or `--use=symbol:logo`.
+Never pick one yourself, and never leave the slot empty without asking.
+
 ### 4. Build
 
 <!-- brandfetch:which-template -->
@@ -255,7 +264,8 @@ python3 <skill-dir>/scripts/build_deck.py template.pptx brand.json out.pptx --va
 ```
 
 Options: `--slides=1,3` fills only those slides (useful when iterating);
-`--strip-notes` empties the speaker notes.
+`--strip-notes` empties the speaker notes; `--use=symbol:icon` fills a
+missing type with another, as the user chose in step 3.
 
 **Speaker notes ship to the client.** The builder fills tokens in them like
 on the slides, and resets the file's title and properties. Unfilled tokens

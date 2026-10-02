@@ -12,7 +12,7 @@ nothing about any particular template is hardcoded — move, resize or reorder
 slots freely and rebuild.
 
     python3 build_deck.py template.pptx brand.json out.pptx \
-        [--values=values.json] [--slides=1,3] [--strip-notes]
+        [--values=values.json] [--slides=1,3] [--strip-notes] [--use=symbol:icon]
 
 An unfilled token stays visible as {token} in the output, so a gap reads as an
 obvious blank to fill rather than a silent omission.
@@ -414,10 +414,10 @@ def clear_doc_props(files, title):
     files[part] = xml.encode("utf-8")
 
 
-def build(template, brand, out, only_slides=None, values=None, strip_notes=False):
+def build(template, brand, out, only_slides=None, values=None, strip_notes=False, use=None):
     import os
     import tempfile
-    text_vals, images, missing = BF.resolve(brand)
+    text_vals, images, missing = BF.resolve(brand, use)
     name = text_vals["{bf:name}"]
 
     # download every needed asset once — both themes for logo/symbol slots,
@@ -438,11 +438,12 @@ def build(template, brand, out, only_slides=None, values=None, strip_notes=False
     assets = {}
     for slot, info in images.items():
         if slot in BF.THEMED:
-            typ = BF.THEMED[slot][0]
+            typ = info.get("type") or BF.THEMED[slot][0]
             variants = {t: download(f"{typ}-{t}", f) for t, f in info["variants"].items()}
         else:
             variants = {None: download(slot.strip("{}").replace("bf:", ""), info)}
-        assets[slot] = {"fit": info["fit"], "variants": variants}
+        assets[slot] = {"fit": info["fit"], "variants": variants,
+                        "type": info.get("type") or (BF.THEMED.get(slot) or [None])[0]}
 
     with zipfile.ZipFile(template) as z:
         files = {n: z.read(n) for n in z.namelist()}
@@ -543,7 +544,7 @@ def build(template, brand, out, only_slides=None, values=None, strip_notes=False
                     log.append((slide, slot, pick_note))
                     continue
                 a = variants[theme_pick]
-                pick_note = f" · {theme_pick} {BF.THEMED[slot][0]}, {pick_note}"
+                pick_note = f" · {theme_pick} {assets[slot]['type']}, {pick_note}"
                 sp = strip_placeholder_outlines(sp, {slot})
             else:
                 a = variants[None]
@@ -558,6 +559,9 @@ def build(template, brand, out, only_slides=None, values=None, strip_notes=False
                 if slot == "{bf:banner}" or slot == "{bf:icon}" or shape == "ellipse"
                 else "contain"
             )
+            # a logo or symbol standing in for a missing icon is never cropped
+            if assets[slot]["type"] in ("logo", "symbol"):
+                fit = "contain"
             # Large square frames (avatar slots) use tight contain — no safe-box
             # inset — so the symbol fills as much of the square as possible
             # without cropping. Regular logo tiles keep the safe-box.
@@ -695,25 +699,34 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if len(args) != 3:
         sys.exit("usage: build_deck.py template.pptx brand.json out.pptx "
-                 "[--values=values.json] [--slides=1,3] [--strip-notes]")
+                 "[--values=values.json] [--slides=1,3] [--strip-notes] [--use=symbol:icon]")
     tpl, bj, out = args
 
-    only, values = None, None
+    only, values, use = None, None, None
     for a in sys.argv[1:]:
+        if a.startswith("--use="):
+            use = BF.parse_use(a.split("=", 1)[1])
         if a.startswith("--slides="):
             only = {int(v) for v in a.split("=", 1)[1].split(",")}
         elif a.startswith("--values="):
             values = json.load(open(a.split("=", 1)[1]))
 
-    r = build(tpl, json.load(open(bj)), out, only, values, "--strip-notes" in sys.argv)
+    brand = json.load(open(bj))
+    r = build(tpl, brand, out, only, values, "--strip-notes" in sys.argv, use)
 
     for k, v in r["text"].items():
         print(f"  {k:26s} {v!r}")
     print()
     for slide, slot, note in r["log"]:
         print(f"  {slide.rsplit('/',1)[-1]:12s} {slot:26s} {note}")
+    for slot, info in BF.resolve(brand, use)[1].items():
+        if "instead_of" in info:
+            print(f"  {slot:26s} uses the {info['type']} (the brand has no {info['instead_of']})")
     if r["missing"]:
         print(f"\n  missing (left empty): {r['missing']}")
+        hint = BF.missing_hint(brand, r["missing"])
+        if hint:
+            print(hint)
     if r["leftover"]:
         print(f"\n  UNFILLED TOKENS: {r['leftover']}")
     print(f"\nwritten: {out}")

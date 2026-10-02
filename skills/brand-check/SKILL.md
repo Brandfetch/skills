@@ -19,11 +19,11 @@ Compare an artifact against the brand's verified record and produce a fix list.
 1. **Establish ground truth.** Fetch the record for each brand named by the user: logos with `type`, `theme`, and formats; colors with hex and role; canonical `name`. If the artifact features multiple brands, confirm which to audit.
 2. **Extract from the artifact.** Pull images, text, and colors (for pptx/pdf/docx use the appropriate parsing tools; for URLs, fetch and parse). Locate every occurrence of the brand: marks, wordmarks, name mentions, brand-colored elements.
 3. **Audit each occurrence:**
-   - **Logo identity:** does the mark match a current asset (compare against record assets visually)? Old marks and favicons-as-logos are findings.
+   - **Logo identity:** does the mark match a current asset? Download the record's variants, composite them on the slide background, trim both, and compare pixels: an exact or near-zero difference is a match. Old marks and favicons-as-logos are findings. A mark that matches no asset of this brand: identify it (`brand_search`, then one `get_brand_data` call) and name the brand it belongs to.
    - **Type and theme:** `light` asset on light background or vice versa is a finding; icon stretched into a header slot is a finding.
    - **Distortion:** changed aspect ratio, recolored or cropped marks.
-   - **Colors:** compute distance from the nearest palette hex; beyond a stated tolerance (default: visibly different) is a finding. Report both hex values.
-   - **Name:** exact match to canonical `name` in spelling and casing.
+   - **Colors:** only on elements that represent the audited brand (its logo, name, or sections themed in its colours); list neutral template colours under "not checked". Compute distance from the nearest palette hex; beyond a stated tolerance (default: visibly different) is a finding. Report both hex values.
+   - **Name:** exact match to canonical `name` in spelling and casing. Unfilled placeholders (`{…}`, lorem ipsum) where the brand name belongs are findings too.
 4. **Report,** ordered by severity: identity errors, then theme/type, then color, then name. Each finding carries location, what is wrong, and the fix: the correct logo file (downloaded from its `src` URL in the record) or hex value. State explicitly what was not checked (layout, typography taste).
 5. **Fix on request.** In editable formats, apply the swaps, then re-run steps 2 to 4 and show the clean report.
 

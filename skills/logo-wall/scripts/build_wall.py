@@ -153,6 +153,10 @@ def resolve(cfg, workdir):
     ground = ground_hex(cfg.get("background", "dark"))
     kind = cfg.get("type", "logo")
     style = cfg.get("style", "mono")
+    if style not in ("mono", "color"):
+        sys.exit(f'"style" must be "mono" or "color" (original brand colours), not {style!r}')
+    if kind not in ("logo", "symbol"):
+        sys.exit(f'"type" must be "logo" or "symbol", not {kind!r}')
     inkc = (cfg.get("ink") or ("FFFFFF" if is_dark(ground) else "111111")).lstrip("#").upper()
     rows = []
     for entry in cfg["brands"]:
@@ -162,6 +166,10 @@ def resolve(cfg, workdir):
         name = entry.get("name") or api_name
         slug = re.sub(r"[^a-z0-9]+", "-", (brand.get("domain") or name).lower()).strip("-")
         row = {"name": name, "entry": entry, "flags": [], "notes": []}
+        asked = os.path.basename(entry["brand"]).removesuffix(".json").lower()
+        got = (brand.get("domain") or "").lower()
+        if got and "." in asked and asked != got:
+            row["notes"].append(f"{asked} resolved to {got}: check it is the same company")
         if not entry.get("name") and "." in api_name:
             row["notes"].append(f"Brandfetch calls it {api_name!r} — set \"name\" if that is "
                                 f"not how it should read (alt text)")

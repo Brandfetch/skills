@@ -32,7 +32,7 @@ DESCRIPTION = (
     "PowerPoint template, pulling the client's logos, colors, description, and "
     "firmographics from the Brandfetch MCP. Use this whenever the user wants to build, "
     "generate, personalize, or fill a sales deck, proposal, or pitch — \"make a sales "
-    "deck\", \"make a deck for Stripe\", \"generate the Acme proposal\", \"personalize our "
+    "deck\", \"make a deck for Stripe\", \"generate the Notion proposal\", \"personalize our "
     "deck for this prospect\"."
 )
 
@@ -71,6 +71,8 @@ def main():
     ap.add_argument("--company", required=True, help="the user's own company, e.g. Acme")
     ap.add_argument("--out", default=".", help="folder to create <name>/ in (default: .)")
     ap.add_argument("--zip", action="store_true", help="also write <out>/<name>.zip")
+    ap.add_argument("--replace", action="store_true",
+                    help="replace an existing <out>/<name>/ (repackaging after a new release)")
     a = ap.parse_args()
 
     if not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", a.name) or len(a.name) > 64:
@@ -83,7 +85,11 @@ def main():
     out = os.path.expanduser(a.out)
     dest = os.path.join(out, a.name)
     if os.path.exists(dest):
-        sys.exit(f"{dest} already exists — pick another --name, or remove it first")
+        if not a.replace:
+            sys.exit(f"{dest} already exists — pick another --name, or pass --replace")
+        if not os.path.isfile(os.path.join(dest, "SKILL.md")):
+            sys.exit(f"{dest} exists but is not a skill folder; refusing to replace it")
+        shutil.rmtree(dest)
 
     for pattern in KEEP:
         for src in sorted(glob.glob(os.path.join(SKILL_DIR, pattern))):

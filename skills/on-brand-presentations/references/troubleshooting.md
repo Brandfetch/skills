@@ -14,7 +14,7 @@ Symptom → most likely cause, in the order actually seen in practice.
    they 302 to a hotlink page, whose host is not allowlisted, hence 403.
 
 **`curl` exit status 23.** Write failure — the destination directory did not
-exist. The bundled builder creates it; a hand-rolled fetch must `mkdir -p`.
+exist. `build_deck.py` creates it; a hand-rolled fetch must `mkdir -p`.
 
 **The variant I need has no PNG.** Real for smaller brands: light-theme
 variants often exist only as SVG or WebP. SVG → rasterise with `cairosvg`

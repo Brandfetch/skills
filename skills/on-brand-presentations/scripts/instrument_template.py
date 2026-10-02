@@ -1126,9 +1126,12 @@ def residue(files, items, skip_slides=False):
     out = []
     lits = {i["find"] for i in items}
     for part in sorted(files):
-        if not part.endswith(".xml") or (skip_slides and SLIDE.fullmatch(part)):
+        if not part.endswith(".xml"):
             continue
         raw = html.unescape(files[part].decode("utf-8", "replace"))
+        if skip_slides and SLIDE.fullmatch(part):
+            # slide text is proposed elsewhere; alt text on shapes is not
+            raw = " ".join(re.findall(r'<p:cNvPr\b[^>]*?\b(?:descr|title)="([^"]*)"', raw))
         for lit in lits:
             if find_pattern(lit).search(raw):
                 where = "speaker notes" if NOTES.fullmatch(part) else \

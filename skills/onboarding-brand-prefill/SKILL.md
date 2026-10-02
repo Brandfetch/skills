@@ -17,15 +17,15 @@ Implement the pattern: work email in, branded first screen out. This is a code-w
 ## Procedure
 
 1. **Locate the flow.** Find where the email is captured and where the post-signup screen renders. Confirm both files with the user.
-2. **Extract the domain.** Take the part after `@`, lowercase it. Maintain a denylist of free providers (gmail.com, outlook.com, yahoo.com, icloud.com, and similar); denylisted domains skip personalization entirely.
+2. **Extract the domain.** Take the part after `@`, lowercase it, and reduce it to the registrable domain (`eu.acme.com` → `acme.com`, using a public-suffix list). Maintain a denylist of free providers (gmail.com, outlook.com, yahoo.com, icloud.com, and similar); denylisted domains skip personalization entirely.
 3. **Fetch server-side.** `GET https://api.brandfetch.io/v2/brands/{domain}` with `Authorization: Bearer <key>`. Timeout at 2 seconds; on timeout or error, render the default flow. Personalization must never block signup.
 4. **Cache.** Store the response by domain (your DB or cache layer, 24h+ TTL). Repeat signups from one company must not spend credits. Cache "no brand" (404) results too, with a shorter TTL (24h to 7d), so a company with no brand doesn't cost a credit per signup. Don't cache timeouts or 5xx errors, but limit retries, and make concurrent lookups for one domain share a single call (signup and the first screen can race).
 5. **Render.**
    - Logo: pick `type: "icon"` for avatars, `type: "logo"` for headers. `theme` names the logo's own colour, not the screen's: a dark screen takes the `theme: "light"` variant, a light screen the `theme: "dark"` one. Not every record has both (icons are often dark only): fall back to the other variant, then to the lettermark.
    - Colors: the `accent` hex (the brand's primary color) into the accent slots. Check contrast against your background before applying.
    - Name and description: prefill the company profile fields, editable by the user.
-6. **Fallback.** For avatar slots with no asset, use the Logo CDN lettermark: `https://cdn.brandfetch.io/{domain}/fallback/lettermark?c={clientId}` (client ID from the developer dashboard). Otherwise render the default theme.
-7. **Enrich the signup record (optional).** If the user also wants new accounts enriched for routing, scoring, or reporting: from the same cached response, write `company.industries[0].name`, `company.employees`, `company.foundedYear`, and `company.location` to the CRM or database record at signup. Same call, no extra credits. `company.employees` is the floor of a size band: show `10001` as "10,001+", never as an exact headcount.
+6. **Fallback.** For avatar slots with no asset, use the Logo CDN lettermark: `https://cdn.brandfetch.io/{domain}/w/64/fallback/lettermark?c={clientId}` (the size segment keeps it avatar-sized) (client ID from the developer dashboard). Otherwise render the default theme.
+7. **Enrich the signup record (optional).** If the user also wants new accounts enriched for routing, scoring, or reporting: from the same cached response, write the industry (the most specific entry in `company.industries` (the first with a non-null `parent`), else the first entry), `company.employees`, `company.foundedYear`, and `company.location.city`, `.country` and `.countryCode` (it is an object) to the CRM or database record at signup. Same call, no extra credits. `company.employees` is the floor of a size band: show `10001` as "10,001+", never as an exact headcount.
 8. **Demo it.** Run the flow with 2 or 3 user-chosen test domains and show the rendered screens or component output.
 
 ## Rules

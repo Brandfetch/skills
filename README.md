@@ -66,9 +66,9 @@ Upload a skill folder with the [Skills API](https://platform.claude.com/docs/en/
 ## Requirements
 
 - A Brandfetch account. The free plan works.
-- **`cdn.brandfetch.io`** on your environment's network allowlist, for
-  skills that download logo files. Allowlist changes apply to new
-  conversations only.
+- **`*.brandfetch.io`** on your environment's network allowlist: `cdn` for
+  skills that download logo files, `api` for skills that call the Brandfetch
+  API directly. Allowlist changes apply to new conversations only.
 - Some code and enrichment skills call the Brandfetch API directly. They ask
   for an API key or client ID from the [developer dashboard](https://developers.brandfetch.com).
 

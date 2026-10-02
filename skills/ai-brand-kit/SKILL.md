@@ -19,8 +19,8 @@ Assemble a paste-ready brand kit from Brandfetch data. The kit replaces model me
 2. **Fetch in parallel:** MCP `get_brand_data` and `get_brand_context` (or the HTTP endpoints above).
 3. **Assemble the kit** with these sections:
    - **Identity:** canonical name, domain, one-line description, tagline verbatim.
-   - **Logos:** for each of `logo`, `symbol`, `icon`: download the file from its `src` URL (exactly as returned) and ship it with the kit, listing theme and format. `theme: light` is a light logo for dark backgrounds, `theme: dark` one for light backgrounds. Note which slot each type is for. Never substitute Logo API (`build_logo_urls`) links for the files.
-   - **Colors:** hex values with roles (`accent` is the primary color, then `brand`, `dark`, `light`).
+   - **Logos:** for each of `logo`, `symbol`, `icon`: download the file from its `src` URL (exactly as returned) and ship it with the kit, listing theme and format. `theme: light` is a light logo for dark backgrounds, `theme: dark` one for light backgrounds. Note which slot each type is for. Ignore `type: "other"` variants unless the record has no `logo`. Never substitute Logo API (`build_logo_urls`) links for the files.
+   - **Colors:** hex values with roles (`accent` is the primary color, then `brand`, `dark`, `light`). No `accent`: write "accent: none on record" and tell the model not to add a brand-coloured highlight.
    - **Typography:** `title` and `body` font names and origins.
    - **Voice:** attributes list, then the avoid-list. Include 1 or 2 verbatim phrases (tagline, mission) as tone anchors.
    - **Visual style:** style attributes from context.

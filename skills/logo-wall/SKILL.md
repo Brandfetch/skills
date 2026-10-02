@@ -65,6 +65,9 @@ co-branded lockup, "Shopify.com") is a check-step item, not an error.
 }
 ```
 
+`"style"` is `"mono"` (one colour) or `"color"` (original brand colours);
+`"type"` is `"logo"` (wordmark) or `"symbol"`. Anything else is refused.
+
 ```bash
 python3 scripts/build_wall.py wall.json --check
 ```

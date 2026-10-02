@@ -17,7 +17,9 @@ Wire a form field to the Brand Search API. This is a code-writing skill; work in
 
 `GET https://api.brandfetch.io/v2/search/{name}?c={clientId}`
 
-Returns ranked matches: `name`, `domain`, `icon` (display-only CDN URL), `claimed`, `verified`, `qualityScore`, `_score`. Results are sorted by relevance.
+URL-encode the name as a path segment (`encodeURIComponent`): a raw `/` ("AC/DC") returns 404, and `&`, `?` and `#` break the query too.
+
+Returns up to 5 ranked matches: `brandId`, `name`, `domain`, `icon` (display-only CDN URL), `claimed`, `verified`, `qualityScore`, `_score`. Results are sorted by relevance. `verified` may be absent (treat it as false); trim `name`, which can carry leading spaces.
 
 ## Procedure
 
@@ -26,10 +28,10 @@ Returns ranked matches: `name`, `domain`, `icon` (display-only CDN URL), `claime
    - Debounce keystrokes (200 to 300ms), minimum 2 characters, cancel in-flight requests on new input.
    - Render each result as icon + name + domain. Embed `icon` URLs exactly as returned in `<img>` tags; they are display-only and must not be edited or fetched programmatically.
    - Keyboard navigation (arrows, enter, escape) and click selection.
-   - On selection, store `domain` as the canonical value and keep the typed text in a secondary field.
+   - On selection, show the selected `name` in the input, store `domain` as the canonical value, and keep the raw typed text in a secondary field. Don't persist `icon`: store the domain and build display URLs with the Logo CDN (see real-logos-migration).
    - No match: keep the free-text value and mark the record unverified. Never block submission on a match.
 3. **Optional prefill.** If the user wants profile prefill after selection, call the Brand API server-side with the selected domain (one credit) and apply the onboarding-brand-prefill pattern: cache by domain, render logo and colors, everything user-editable.
-4. **Demo.** Run or render the component with 3 test queries, including one ambiguous name ("Delta") to show ranking, and one obscure name to show the no-match path.
+4. **Demo.** Run or render the component with 3 test queries, including one ambiguous name ("Delta") to show ranking, and one nonsense string (`qxzvkqwplmz`) to show the empty-results UI. Search is fuzzy, so a merely obscure name returns unrelated results rather than none: the real no-match path is "the user selects nothing", and the record stays free-text and unverified.
 
 ## Rules
 

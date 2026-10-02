@@ -133,8 +133,8 @@ each token substitutes independently.
 
 Use fonts that ship with Office (Arial, Calibri, Cambria...) or accept two
 costs: recipients without the font get a substituted layout, and your own
-preview becomes untrustworthy for overflow (see `setup.md`). The reference
-template is Arial with ~15% frame slack for exactly this reason.
+preview becomes untrustworthy for overflow (see `setup.md`). Arial with ~15%
+frame slack is the safe default.
 
 ## Checklist for a hand-built template
 
