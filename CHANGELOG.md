@@ -11,10 +11,8 @@ First release.
 
 - Bundles the hosted Brandfetch MCP server (`https://mcp.brandfetch.io/mcp`,
   OAuth or `bf1.` token) as `.mcp.json`.
-- Deliverable skills: `on-brand-presentations`, `logo-wall`,
-  `prospect-branded-pages`, `ai-brand-kit`, `pre-call-brand-brief`,
-  `brand-check`.
-- Data enrichment skills: `crm-brand-enrichment`,
-  `transaction-enrichment-test`, `ticker-logos`.
-- Code skills: `company-autocomplete`, `onboarding-brand-prefill`,
-  `real-logos-migration`.
+- Skills: `on-brand-presentations`, `logo-wall`.
+- `on-brand-presentations` onboarding packages the user's template as a
+  template-only skill (`package_template.py`, template format 1) that the
+  plugin fills, instead of a copy of the whole skill, so template users keep
+  receiving plugin updates.
