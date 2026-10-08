@@ -1,7 +1,7 @@
 # Onboarding: set up your template
 
 Turns a deck the user sent a client into their template, then hands it
-over as a file or as their **template skill**. It never edits this skill's
+over as a file and as their **template skill**. It never edits this skill's
 folder. `<skill-dir>` below is this skill's folder, as in `SKILL.md`.
 
 Triggered by "set up my template", "use my deck as the template", or an
@@ -92,43 +92,45 @@ instrumenting an instrumented file.
 
 ### 6. Hand it over
 
-Ask:
+Don't ask how they want to use it: deliver **both** in the same turn, as
+files they can download:
 
-> Your template is ready. How do you want to use it?
-> 1. **Install it as your template** (recommended if you'll make decks
->    often) — I'll wrap it in a small skill named after your company.
->    Install it once, and "make a deck for Stripe" uses it automatically.
->    The Brandfetch skill still does the building, so you keep getting its
->    updates.
-> 2. **Keep the file** — attach it whenever you want a deck; I'll fill it.
+- **the template**, named after the user's company (`Acme template.pptx`):
+  theirs to keep, share and attach to any chat;
+- **their template skill**, `acme-deck-template.skill`. Once installed,
+  "make a deck for Stripe" uses the template without an attachment.
 
-Either way, return the template file itself, named after the user's company
-(`Acme template.pptx`) — it is theirs to keep and share.
-
-**Template skill.** Name it after the user's **own** company, not the
-deck's client (`acme-deck-template`); ask if you do not know it. Then:
+Name the skill after the user's **own** company, not the deck's client
+(`acme-deck-template`). If you don't know the company yet, ask together with
+the step 5 review, so the handover never waits on a question.
 
 ```bash
 python3 <skill-dir>/scripts/package_template.py template.pptx \
-    --name acme-deck-template --company "Acme" --out <dir> --zip
+    --name acme-deck-template --company "Acme" \
+    --out <work-dir> --skill-file <outputs>/acme-deck-template.skill
 ```
 
-It holds the template and a short SKILL.md that points back to this skill —
-no scripts, no rules, nothing that goes stale.
+It holds the template and a short SKILL.md that points back to this skill:
+no scripts, no rules, nothing that goes stale. `--out` is a working folder
+for the unpacked skill. Keep it out of the outputs, or the user gets its
+loose files as downloads too.
 
-- **Claude Code:** `--out ~/.claude/skills` installs it for the next
-  session; return the zip too, for teammates or claude.ai.
-- **claude.ai:** `--out` a writable folder; return the zip. They upload it
-  in **Settings → Capabilities → Skills**.
+- **claude.ai / Claude Desktop:** write both files to the outputs folder
+  (`/mnt/user-data/outputs/`) and present them. The `.skill` file comes with
+  a button to save it to their skills. Otherwise they upload it in
+  **Settings → Capabilities → Skills**.
+- **Claude Code:** pass `--out ~/.claude/skills` so it is installed for the
+  next session, and still write the `.skill` file for teammates and
+  claude.ai.
 
-Tell them, once, in plain words:
+Then tell them, briefly:
 
-- Keep the Brandfetch plugin installed: their template skill only holds the
-  file, and the Brandfetch skill builds the deck.
+- They can install the skill or just keep the `.pptx` and attach it
+  whenever they want a deck. Both work.
+- Keep the Brandfetch plugin installed. The template skill only holds the
+  file; the Brandfetch skill builds the deck, so they keep getting its
+  updates.
 - To change the template, onboard the new deck and package it again under
   the same name (`package_template.py … --replace`), then reinstall.
-- On Team or Enterprise, an admin can give the zip to the whole
-  organization, so everyone's decks start from the same template.
-
-**Keep the file.** Nothing else to do. Next time: attach the template and
-say who the deck is for.
+- On Team or Enterprise, an admin can share the `.skill` file with the
+  whole organization, so everyone's decks start from the same template.

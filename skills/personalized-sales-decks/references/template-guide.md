@@ -1,7 +1,7 @@
 # Your own template
 
 How to make the skill fill **your** deck. (No deck yet? Ask for a new
-design in the brand — `from-scratch.md` — and onboard that.)
+design in the brand — the `on-brand-presentations` skill — and onboard that.)
 
 ## The easy way: onboard a deck you already sent
 
@@ -16,10 +16,11 @@ template"*. Claude:
    `{kick_off_date}`), and asks about anything it is unsure of;
 3. writes the template once you agree, test-fills it with a different brand,
    and shows you both;
-4. hands it over your way: as **your template skill** (a small skill named
-   after your company that holds just your template — a zip for claude.ai,
-   or installed straight into `~/.claude/skills/` in Claude Code), or as a
-   **template file** you attach whenever you want a deck. Either way the
+4. hands you both: **your template skill** (a small skill named after your
+   company that holds just your template: a `.skill` file you save to your
+   skills in claude.ai, installed straight into `~/.claude/skills/` in
+   Claude Code) and the **template file** to attach whenever you prefer.
+   Either way the
    Brandfetch skill does the building and is never changed, so you keep its
    updates and they never touch your template.
 

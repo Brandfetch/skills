@@ -7,10 +7,11 @@ template" end of onboarding.
     python3 package_template.py template.pptx --name acme-deck-template --company "Acme" \
         --out ~/.claude/skills            # Claude Code: installed for the next session
     python3 package_template.py template.pptx --name acme-deck-template --company "Acme" \
-        --out outputs --zip               # claude.ai: a zip to upload in Skills settings
+        --out work --skill-file /mnt/user-data/outputs/acme-deck-template.skill
+                                          # claude.ai: a .skill file the user saves to their skills
 
 The template skill holds data, not logic: the template and a short SKILL.md
-that hands every deck to the Brandfetch on-brand-presentations skill. The
+that hands every deck to the Brandfetch personalized-sales-decks skill. The
 building stays in the plugin, so its fixes and new {bf:*} fields reach every
 user's template without repackaging. This skill's folder is only read, never
 written.
@@ -24,13 +25,13 @@ import sys
 import zipfile
 
 SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUILDER = os.path.basename(SKILL_DIR)  # on-brand-presentations
+BUILDER = os.path.basename(SKILL_DIR)  # personalized-sales-decks
 
 # Bump when a template built for this version would no longer build on an
 # older plugin. SKILL.md's *Which path* names the formats it reads.
 TEMPLATE_FORMAT = 1
 
-# The opening of the description is what on-brand-presentations looks for in
+# The opening of the description is what personalized-sales-decks looks for in
 # the skill list (SKILL.md, *Which path*); change both together.
 DESCRIPTION = (
     "{company}'s deck template for the Brandfetch {builder} skill. Use it whenever "
@@ -72,7 +73,8 @@ def main():
     ap.add_argument("--name", required=True, help="skill name, e.g. acme-deck-template")
     ap.add_argument("--company", required=True, help="the user's own company, e.g. Acme")
     ap.add_argument("--out", default=".", help="folder to create <name>/ in (default: .)")
-    ap.add_argument("--zip", action="store_true", help="also write <out>/<name>.zip")
+    ap.add_argument("--skill-file", metavar="PATH",
+                    help="also write the skill as one installable .skill file (a zip) at PATH")
     ap.add_argument("--replace", action="store_true",
                     help="replace an existing <out>/<name>/ (a new version of the template)")
     a = ap.parse_args()
@@ -84,6 +86,8 @@ def main():
     company = " ".join(a.company.split())
     if not company:
         sys.exit("--company must not be empty")
+    if a.skill_file and not a.skill_file.endswith(".skill"):
+        sys.exit("--skill-file must end in .skill: that is what claude.ai offers to install")
     if not zipfile.is_zipfile(a.template):
         sys.exit(f"{a.template} is not a .pptx")
 
@@ -106,14 +110,15 @@ def main():
                                 company=company, builder=BUILDER))
     print(f"skill:  {dest}")
 
-    if a.zip:
-        zpath = os.path.join(out, a.name + ".zip")
+    if a.skill_file:
+        zpath = os.path.expanduser(a.skill_file)
+        os.makedirs(os.path.dirname(os.path.abspath(zpath)), exist_ok=True)
         with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
             for root, _, files in os.walk(dest):
                 for fn in sorted(files):
                     full = os.path.join(root, fn)
                     z.write(full, os.path.relpath(full, out))
-        print(f"zip:    {zpath}")
+        print(f"file:   {zpath}")
 
 
 if __name__ == "__main__":

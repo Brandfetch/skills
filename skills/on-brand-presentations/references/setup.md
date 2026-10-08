@@ -1,77 +1,40 @@
 # Setup
 
-Two of these steps fail in non-obvious ways when skipped. Do them in order.
+Two of these steps fail in non-obvious ways when skipped.
 
 ## 1. Connect the Brandfetch MCP
 
-The skill's brand data comes from the Brandfetch MCP (`get_brand_data`). Connect
-it from the connector directory, or add it manually:
-`https://mcp.brandfetch.io/mcp`.
+Brand data comes from the Brandfetch MCP (`get_brand_data`,
+`get_brand_context`, `brand_search`). Connect it from the connector
+directory, or add it manually: `https://mcp.brandfetch.io/mcp`.
 
 Without it there is no data source — the skill will not invent brand facts.
 
 ## 2. Allowlist the Brandfetch CDN
 
 Logo files are downloaded by `curl` from **`cdn.brandfetch.io`**. If your
-Claude environment restricts network egress, add that host to the allowlist
-(Settings → your organisation's network egress settings).
+Claude environment restricts network egress, add that host to the allowlist.
 
 Two traps, both learned the slow way:
 
 - **The allowlist is read at conversation start.** A change does not apply to
-  the conversation you made it from — open a new chat and test again there.
-- **A 403 is not always the network.** An edited `?c=` credential on the URL
-  also surfaces as a 403 (see `troubleshooting.md`). Test with a `src` URL
-  copied verbatim from a `get_brand_data` response before concluding the
-  allowlist is wrong.
+  the conversation you made it from — open a new chat and test there.
+- **A 403 is not always the network.** The `?c=` parameter on every `src` URL
+  is a credential; an edited or rebuilt URL also surfaces as a 403. Use `src`
+  URLs verbatim from a `get_brand_data` response before blaming the
+  allowlist. URLs from `build_logo_urls` are display-only and cannot be
+  fetched at all.
 
-Quick test once configured:
+Quick test:
 
 ```bash
 curl -sS -o /tmp/t.png "<any src URL from a get_brand_data response>" \
   && python3 -c "from PIL import Image; print(Image.open('/tmp/t.png').size)"
 ```
 
-## 3. Fonts (optional, but read this)
+## 3. Presentation tooling
 
-A template in an Office font (**Arial**, Calibri…) with generous frame slack
-renders acceptably with no fonts installed at all.
-
-If your template uses other fonts, install them in the render environment
-before trusting any preview: LibreOffice substitutes missing fonts with
-different widths, and text then *appears* to overflow when it does not
-(rules.md #8). Check with:
-
-```bash
-fc-list | grep -ci "<your font>"   # 0 = previews are approximate
-```
-
-Also point `FONT_CANDIDATES` in `scripts/build_deck.py` at your font's .ttf
-files so text-frame growth is measured in the right metrics.
-
-## 4. Python dependencies
-
-`Pillow` (image sizing) is required. `cairosvg` is needed only when a brand's
-required variant exists as **SVG only** — it happens (small brands, light-
-theme variants) and PowerPoint embedding wants a raster:
-
-```bash
-pip install cairosvg
-python3 -c "import cairosvg; cairosvg.svg2png(url='mark.svg', write_to='mark.png', output_width=800)"
-```
-
-WebP-only variants: convert with Pillow (`Image.open('x.webp').save('x.png')`)
-— older PowerPoint does not render WebP.
-
-## 5. Verify the loop once
-
-```bash
-# get_brand_data for any well-known domain → save verbatim as brand.json
-python3 <skill-dir>/scripts/bf_fields.py brand.json                   # preview resolution
-python3 <skill-dir>/scripts/scan_template.py template.pptx            # the user's template: no warnings
-python3 <skill-dir>/scripts/build_deck.py template.pptx brand.json out.pptx
-```
-
-If all three run clean, the environment is ready. No template yet? The
-first `bf_fields.py` line alone proves the MCP and the data; onboarding
-exercises the rest.
+This skill decides the branding; the environment's pptx tooling (a pptx
+skill, `python-pptx` or `pptxgenjs`) builds the file. `cairosvg` is needed
+only when a brand's logo exists as SVG only. Convert WebP-only variants to
+PNG with Pillow: older PowerPoint does not render WebP.

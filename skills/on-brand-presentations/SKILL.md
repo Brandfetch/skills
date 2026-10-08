@@ -1,206 +1,102 @@
 ---
 name: on-brand-presentations
-description: Make a sales, pitch, proposal or QBR deck for a company in verified brand data from the Brandfetch MCP — real logos, exact colors, fonts, description and firmographics. Two ways — fill the user's own PowerPoint template (or a deck they already sent a client, turned into one), or design a new deck from scratch in the brand. Use this whenever the user wants to build, generate, personalize or fill a deck, presentation or proposal — "make a sales deck", "make a deck for Stripe", "an on-brand presentation for Acme", "personalize my template for this prospect", "set up my template", "turn this deck into a template" — or to instrument or check a PPTX template with {bf:*} or {custom} tokens. For a slide of many customer logos, use logo-wall instead.
+description: Design a new presentation in a company's verified brand from the Brandfetch MCP — real logos, exact colors, fonts and brand voice. Use this for any deck that is not a sales deck to a client — internal decks (all-hands, strategy, roadmap, training), investor and board decks, conference talks, partner or co-branded decks, or a deck about the user's own company — "make a deck for the all-hands", "a deck for our board", "an on-brand deck about our Q3 roadmap", "a presentation in Acme's brand". Also used when personalized-sales-decks hands over a client deck to design new because the user has no template. For a sales, pitch, proposal or QBR deck for a client or prospect, use personalized-sales-decks; for a slide of many customer logos, use logo-wall.
 license: MIT
 ---
 
 # On-brand presentations
 
-Makes a deck for a company from its real brand assets: either by filling
-the user's PowerPoint template with the client's brand and the deal's
-values, or by designing a new deck in the brand. Brand data comes from the **Brandfetch
-MCP**; everything else comes from the conversation. Never from anywhere else.
+Designs a new deck in a brand's verified identity: its real logos, colors,
+fonts and voice. Brand data comes from the **Brandfetch MCP**; content comes
+from the conversation. Never from model memory.
 
-Building a deck **never** writes to this skill or its template: the output
-is always a new file. Work in the user's own folder or a scratch folder,
-**never inside this skill's folder** — the user's decks, `brand.json` and
-previews must not end up next to the skill's files. Commands below are
-written `<skill-dir>/scripts/…`: substitute this skill's folder path and run
-them from the working folder.
+**Which skill.** A deck **for a client or prospect** (sales, pitch, proposal,
+QBR) belongs to `personalized-sales-decks`, which fills the user's own
+template. Hand it over unless that skill sent the deck here because the user
+has no template and wants one designed. Everything else is this skill.
 
-## Which path
+## Requirements
 
-Decide before anything else:
-
-1. **A `.pptx` is attached.** Scan it (`<skill-dir>/scripts/scan_template.py`):
-   - **Tokens, no warnings** — the user's template. Go to *Every deck* with it.
-   - **"No tokens found"** — a deck they sent a client. Go to *Onboarding*;
-     if they already named the new client ("make the same for Stripe"), use
-     that client for the test-fill (onboarding step 4), so onboarding ends
-     with their deck.
-   - **"PARTLY FILLED DECK"** — a deck built for a client from a template.
-     Never fill it: that client's logo would stay in every deck. Ask for the
-     original template, or onboard this deck.
-   - Keynote, PDF or Google Slides: ask for a `.pptx` export.
-2. **Nothing attached, and a template skill is installed.** Onboarding
-   packages the user's template as a small skill of its own — no logic, just
-   `assets/template.pptx` — whose description reads *"…deck template for the
-   Brandfetch on-brand-presentations skill"*. If one is in your skill list,
-   load it, and use its template for *Every deck*; ask for the company if
-   they have not named it. Several → ask which. Its SKILL.md states a
-   `brandfetch-template-format`; this skill reads format **1**. A higher
-   number means the plugin is out of date — tell the user to update it.
-3. **Nothing attached, no template skill.** Ask once, in one message, both
-   what you still need: *"Who is the deck for (company or domain)? And do
-   you have a deck to start from — your template, or one you've already
-   sent a client? Attach it, or I'll design a new deck."* Skip the first
-   question if they named the company. Attached → step 1. New design →
-   `references/from-scratch.md`.
-
-**Requirements:** the Brandfetch MCP connected, and `cdn.brandfetch.io` on
-the network allowlist. `references/setup.md` has the traps.
-
-## Two namespaces, one rule
-
-| Token | Resolved by | Example |
-|---|---|---|
-| `{bf:*}` | This skill, from the Brandfetch API | `{bf:name}`, `{bf:logo}` |
-| everything else | You, at build time | `{fee}`, `{start_date}`, `{anything}` |
-
-The skill has no vocabulary of its own: name your tokens after whatever your
-business sells. Unfilled tokens stay visible as `{token}` in the output — a
-gap reads as an obvious blank, never a silent omission.
+- The Brandfetch MCP connected (preferred), or `BRANDFETCH_API_KEY` for HTTP
+  with `Authorization: Bearer <key>`; and `cdn.brandfetch.io` on the network
+  allowlist. `references/setup.md` has the traps.
+- A way to produce the deck: the environment's pptx tooling or skill. Follow
+  that tooling's own guidance for construction; this skill governs the
+  branding inputs. If there is none, don't hand-write OOXML; tell the user:
+  *"I can't produce a .pptx here: no presentation tooling (python-pptx,
+  pptxgenjs or a pptx skill) is available. Enable one and ask again."*
+- Cost: 2 credits per brand (`GET /v2/brands/{domain}` +
+  `GET /v2/context/{domain}`).
 
 ## The one rule that matters most
 
-**Never invent a customer fact or a deal value.**
+**Never invent a fact about a company.** Every number, claim and name about
+a brand comes from the `get_brand_data` or `get_brand_context` response, or
+from something the user said in this conversation. If it is in neither, ask,
+or leave it out and say so. A plausible figure recalled from training data is
+the failure this rule exists for: it is wrong, and nobody proofreading
+catches it.
 
-Every value on a slide comes from a field in the `get_brand_data` response or from
-something the user actually said in this conversation. There is no third
-source. This rule exists because it was broken: an early build shipped
-"33,000+ employees" recalled from training data when the API said `10001`.
-Plausible, wrong, and invisible to a proofreader — plausibility is what makes
-this failure dangerous. A fabricated fee or scope is worse: it is a commercial
-commitment nobody made.
+## Procedure
 
-If a value is not in the conversation, **ask**. If a brand field is missing
-from the API, leave the slot empty and say so. An obvious gap is recoverable;
-a confident wrong number is not.
+1. **Resolve the brand.** Domain from the user, or `brand_search` /
+   `GET /v2/search/{name}` for a name; confirm ambiguous matches. Note whose brand the deck is in: the user's own
+   company (most internal and investor decks) or another company's. A client
+   deck handed over by `personalized-sales-decks` is in the user's own brand,
+   with the client's logo on the cover; ask for the user's company if it is
+   unknown.
+2. **Fetch the kit.** `get_brand_data` and `get_brand_context` in parallel.
+3. **Get real asset bytes.** Download the asset `src` URLs from the
+   `get_brand_data` response verbatim. Their `?c=` parameter is a
+   credential, so never edit or rebuild one. If the CDN cannot be reached,
+   read the MCP's `bf://asset/{domain}/{type}` resources instead. URLs from
+   `build_logo_urls` are display-only and cannot be downloaded. Prefer the
+   largest PNG; use SVG only if your tooling rasterises it (`cairosvg`),
+   since older Office handles embedded SVG poorly. Pick `theme` variants to
+   match slide backgrounds: a dark slide takes the `light` logo.
+4. **Apply the brand.**
+   - Logos: title slide (type `logo`), small footer or corner mark on
+     content slides (type `icon` or `symbol`). If the brand lacks a type the
+     design needs, ask which of the types it has to use instead ("Stripe has
+     no symbol. Should I use its icon or its logo there?"). Composite the
+     files; never redraw, recolor, stretch, or crop.
+   - Colors: `accent` (the brand's primary color), then `brand` colors, for
+     accents, headings, and charts. Backgrounds stay neutral (the brand's
+     `light`/`dark` values) unless the user asks for a full-bleed brand
+     look. Check text contrast on every colored element; fix by switching
+     the text color, not the brand hex.
+   - Fonts: use the brand `title` font when its `origin` is google or system
+     (installable); otherwise use a close neutral and record the
+     substitution in the delivery note.
+   - Copy: match the brand's voice attributes and avoid-list from context.
+     Quote the tagline verbatim if used.
+5. **Content.** Build slides from the user's outline or brief. When the deck
+   is about a company, ground it in the description, positioning and
+   audience from context. Never invent metrics.
+6. **Render and look.** Render the deck to images (LibreOffice → PDF →
+   images) and check every slide: contrast, logo legibility, overflow. A
+   valid file is not the same as a good-looking one.
+7. **Deliver** the .pptx plus a short note: assets used (with types and
+   themes), hex values applied, font decisions, and anything substituted.
 
-## Onboarding: set up your template
+## Rules
 
-When the user wants to set up or change their template ("set up my
-template", "use my deck as the template"), or attached a deck they sent a
-client, read `references/onboarding.md` and follow it. It turns that deck
-into a template and packages it as the user's template skill.
+- Real logo files only. If no usable logo exists, say so and build with name
+  text; never generate one.
+- Two brands maximum per deck (e.g. user's plus partner's); keep each
+  brand's assets in its own zones, and never blend palettes.
+- Another company's brand on a deck identifies them; it must not imply
+  endorsement of the user. Add no fake partnership marks.
+- On HTTP 429, stop and report quota via `GET /v2/viewer` (free).
 
-## Every deck: build for a client
+## Afterwards
 
-### 1. Get the brand data
-
-Call the Brandfetch MCP `get_brand_data` with the client's domain and save the full
-response **verbatim** to `brand.json` — the scripts read it from disk, so
-nothing is transcribed by hand.
-
-Preview what will resolve, and show it to the user:
-
-```bash
-python3 <skill-dir>/scripts/bf_fields.py brand.json
-```
-
-### 2. Collect the user-token values
-
-Scan the template to see which non-`bf:` tokens it expects:
-
-```bash
-python3 <skill-dir>/scripts/scan_template.py template.pptx
-```
-
-Read the conversation first — in a real deal thread most values have already
-been mentioned, and asking for something the user just told you is worse than
-useless. Extract what is there, then ask only for the gaps. Write them to
-`values.json`, keyed by token:
-
-```json
-{
-  "{engagement_type}": "Operating model review",
-  "{fee}": "USD 180,000"
-}
-```
-
-Omitting a value is fine and often correct — an early-stage deck may
-genuinely not have a fee yet. The token stays visible in the output.
-
-### 3. Confirm before generating
-
-Show the resolved brand fields and the user values together, and wait. This
-is the cheapest place to catch a wrong employee band or a misheard fee.
-
-**A missing logo type is a question, not a gap.** When `bf_fields.py` (or the
-build) prints `ASK THE USER`, the brand lacks a logo type the template uses.
-Ask in the same message, offering only the types it has:
-
-> Stripe has no symbol. Should I use its icon or its logo there?
-
-Then build with their answer, `--use=symbol:icon` or `--use=symbol:logo`.
-Never pick one yourself, and never leave the slot empty without asking.
-
-### 4. Build
-
-**Use the template chosen in *Which path*.** Say which you used. A
-template skill's file is read-only: build from its path, never edit it.
-
-```bash
-python3 <skill-dir>/scripts/build_deck.py template.pptx brand.json out.pptx --values=values.json
-```
-
-Options: `--slides=1,3` fills only those slides (useful when iterating);
-`--strip-notes` empties the speaker notes; `--use=symbol:icon` fills a
-missing type with another, as the user chose in step 3.
-
-**Speaker notes ship to the client.** The builder fills tokens in them like
-on the slides, and resets the file's title and properties. Unfilled tokens
-in notes are listed under `UNFILLED TOKENS` (`ppt/notesSlides/…`): those
-notes are template instructions, not speaker notes. Rebuild with
-`--strip-notes`, or ask the user what the notes should say.
-
-For `{bf:logo}` and `{bf:symbol}` slots the builder picks the light or dark
-variant per slot by measuring which is visible on the colour underneath, and
-leaves the slot empty (dashed box kept) when neither is — relay any
-`LEFT EMPTY` line to the user. Never override it by hand-placing a variant.
-
-The builder prints every slot it filled, every frame it resized, and any
-tokens left unfilled. Read that output — it is the build's own audit trail.
-Dashed placeholder outlines are stripped from every slot it fills; unfilled
-slots keep theirs, so gaps stay visibly marked.
-
-The output is a new file. The template and the skill are never written to.
-
-### 5. Verify
-
-```bash
-python3 <pptx-skill>/scripts/office/validate.py out.pptx --original template.pptx
-```
-
-Then render it and actually look at it (LibreOffice → PDF → images). Schema
-passing does not mean the slides look right. If the template's fonts are not
-installed, the preview's text fit is approximate — see
-`references/setup.md` before "fixing" an overflow that does not exist.
-
-## When the template changes
-
-Re-run the scanner after any edit or re-export — token names drift, and a
-retyped token can end up split across text runs. The builder merges split
-runs before substituting, but the scanner will tell you what it found and
-what it will do, before you build.
+A client deck handed over by `personalized-sales-decks`: if the user will
+make decks like this again, offer once: *"Want me to turn this into your
+template? Next time you'd just name the client."* Yes → onboarding in
+`personalized-sales-decks`, with this deck as the deck they sent and its
+client as the client.
 
 ## Files
 
-- `references/onboarding.md` — turn a deck the user sent a client into
-  their template, and package it as their template skill.
-- `references/from-scratch.md` — the new-design path: brand kit in, deck
-  out, through the environment's pptx tooling.
-- `scripts/instrument_template.py` — onboarding: `--detect` proposes,
-  `--apply` writes the template.
-- `scripts/package_template.py` — onboarding: the user's template skill,
-  their template and nothing else; this skill does the building.
-- `scripts/build_deck.py` — the builder.
-- `scripts/bf_fields.py` — `{bf:*}` field mapping and asset selection. Run
-  standalone to preview resolved values.
-- `scripts/scan_template.py` — template linter. Run after instrumenting.
-- `references/template-guide.md` — how templates work: onboarding first,
-  hand-instrumenting as the advanced path.
-- `references/rules.md` — the geometry and data rules, each with the
-  regression that produced it.
-- `references/setup.md` — MCP, network allowlist, fonts, dependencies.
-- `references/troubleshooting.md` — symptom → cause table.
+- `references/setup.md` — MCP, network allowlist, and the 403 trap.

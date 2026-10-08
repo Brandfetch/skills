@@ -2,7 +2,7 @@
   "name": "brandfetch",
   "displayName": "Brandfetch",
   "version": "1.0.0",
-  "description": "Brand data and assets for AI agents. Bundles the official Brandfetch MCP server (search 50M+ brands, get logos, colors, fonts, company data) with skills that turn it into finished work: on-brand decks from your own template or from scratch, and logo walls.",
+  "description": "Brand data and assets for AI agents. Bundles the official Brandfetch MCP server (search 50M+ brands, get logos, colors, fonts, company data) with skills that turn it into finished work: sales decks personalized for each client from your own template, on-brand presentations designed in any brand, and logo walls.",
   "author": {
     "name": "Brandfetch",
     "email": "support@brandfetch.com",
