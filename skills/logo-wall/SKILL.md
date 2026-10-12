@@ -1,6 +1,6 @@
 ---
 name: logo-wall
-description: Generate a customer or partner logo wall — as PPTX, PDF, HTML or PNG — from a list of brands, with verified logos from the Brandfetch MCP, optically balanced so no logo looks bigger or smaller than the rest. Use this whenever the user asks for a logo wall, logo grid, logo strip, customer wall, "trusted by" or "as seen in" section, social-proof slide, or any slide or web section showing many company logos — "make a logo wall of our 12 customers", "a trusted-by slide with these brands", "put these logos on a dark background". For a full personalized deck for ONE client, use the on-brand-presentations skill instead.
+description: Generate a customer or partner logo wall — as PPTX, PDF, HTML or PNG — from a list of brands, with verified logos from the Brandfetch MCP, optically balanced so no logo looks bigger or smaller than the rest. Use this whenever the user asks for a logo wall, logo grid, logo strip, customer wall, "trusted by" or "as seen in" section, social-proof slide, or any slide or web section showing many company logos — "make a logo wall of our 12 customers", "a trusted-by slide with these brands", "put these logos on a dark background". For a full personalized deck for ONE client, use the personalized-sales-decks skill instead.
 license: MIT
 ---
 
@@ -41,12 +41,50 @@ Past ~20 logos a single wall stops being scannable — suggest the strongest
 
 ## 2. Resolve every brand and save it
 
-Call `get_brand_data` per domain (resolve names with `brand_search` first and
-confirm ambiguous matches). Save each response **verbatim** to
-`brands/<domain>.json` — the script reads the logo variants from disk and
-picks between them itself. Never copy URLs into a config by hand: the `?c=`
-parameter is a credential that breaks when edited, and hand-picked variants skip the
-pixel checks below.
+Resolve names with `brand_search` first and confirm ambiguous matches. Then
+fetch every brand in **one `get_brands` call** (up to 25 identifiers; for
+more, split the list and make the calls in parallel).
+
+Write `brands.json` (`brands-2.json`…) with **only what the script reads**,
+keeping every result in the order sent:
+
+```json
+{"results": [
+  {"identifier": "stripe.com", "status": 200, "brand": {
+    "name": "Stripe", "domain": "stripe.com",
+    "logos": [
+      {"type": "logo", "theme": "light", "formats": [{"format": "png", "src": "<src as returned>"}]},
+      {"type": "logo", "theme": "dark",  "formats": [{"format": "png", "src": "<src as returned>"}]}]}},
+  {"identifier": "acme.example", "status": 404, "message": "Invalid Domain Name"}
+]}
+```
+
+- `logos`: every entry of the wall's type (`logo` or `symbol`), each theme,
+  with **one** format: the first of png, jpeg, webp, svg it has.
+- Leave out everything else: colors, fonts, company, descriptions, icons,
+  other formats. Writing the full response is what makes a wall slow: each
+  brand is ~3 KB the script never reads.
+- A result that is not 200: keep `identifier`, `status`, `code` and
+  `message`.
+- Copy each `src` **exactly**, character for character. Its `?c=` parameter
+  is a credential: an edited or rebuilt URL fails.
+
+List the file in `wall.json`; the script reads every brand in it and picks
+between the logo variants itself, from pixels.
+
+If `get_brands` is not available, or refuses the call (batch lookups need a
+paid plan or prepaid credits; nothing is charged), call `get_brand_data` per
+domain instead, in parallel, and write the same trimmed fields for each
+brand to `brands/<domain>.json` (`name`, `domain`, `logos`, no `results`
+wrapper).
+
+Never pick a variant by hand: hand-picked variants skip the pixel checks
+below.
+
+A brand the batch could not return (`status` 202, `crawl_queued`) is
+flagged by the check: Brandfetch has queued it for indexing. Tell the user,
+and say the domain may simply be wrong, since a typo comes back the same
+way. Drop it, or fetch it again later.
 
 Note the name the API returns. A surprising one (a parent brand, a
 co-branded lockup, "Shopify.com") is a check-step item, not an error.
@@ -61,7 +99,7 @@ co-branded lockup, "Shopify.com") is a check-step item, not an error.
   "type": "logo",
   "formats": ["pptx"],
   "out": "logo-wall",
-  "brands": ["brands/stripe.com.json", "brands/slack.com.json"]
+  "brands": ["brands.json"]
 }
 ```
 
@@ -81,13 +119,24 @@ with the report. Every `!` line is a decision for the user:
   one-colour version exists and flattening merges parts of the mark
   (Mastercard's overlap, Figma's lobes). Options: accept, drop the brand, or
   switch this wall to original colours.
+
+  **For a brand from a batch file, look first:** `get_brands` leaves out
+  logos of type `other`, and that is where a brand's official one-colour
+  variant often lives (Shopify's). Call `get_brand_data` for that brand,
+  write its `name`, `domain` and `logos` of the wall's type **and** `other`
+  (one format each, as in step 2) to `brands/<domain>.json`, set
+  `{"brand": "brands.json#shopify.com", "full": "brands/shopify.com.json"}`,
+  and check again. Ask the user only if it is still flagged.
 - **no usable asset** — the brand has no logo of that type (many have no
   symbol). Drop it, or use wordmarks for the whole wall.
 - **not visible in colour** — neither variant shows on this background.
+- **not indexed yet** — the batch could not return the brand (see step 2).
+  Drop it, or fetch it again later.
 
 Record the answer on the brand's entry — `{"brand": "…", "accept": true}` or
-`{"brand": "…", "drop": true}`. The build refuses to run while a flag is
-undecided. `i` lines are information worth one sentence to the user (a
+`{"brand": "…", "drop": true}`. For a brand from a batch file, name it with
+the identifier you sent: `{"brand": "brands.json#figma.com", "drop": true}`.
+The build refuses to run while a flag is undecided. `i` lines are information worth one sentence to the user (a
 two-line lockup like "slack / from Salesforce", an odd API name — fix with
 `"name": "Shopify"`).
 

@@ -374,7 +374,9 @@ def label_for(unit, units, text, match_start):
     """
     prefix = text[:match_start].rstrip()
     if prefix.endswith((":", "–", "—", "-")):
-        words = prefix.rstrip(":–—- ").split()
+        # "Prepared for Acme · Kick-off: 12 May": the label is the last
+        # segment, not the whole line
+        words = re.split(r"[·•|;,]", prefix.rstrip(":–—- "))[-1].split()
         if 0 < len(words) <= 4:
             return " ".join(words)
     return neighbour_label(unit, units)[0]
