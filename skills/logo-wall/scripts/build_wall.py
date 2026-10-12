@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Build a logo wall — PPTX, PDF, HTML and/or PNG — from saved get_brand_data responses.
+Build a logo wall — PPTX, PDF, HTML and/or PNG — from saved get_brands (or
+get_brand_data) responses.
 
     python3 build_wall.py wall.json --check     # pick, verify, preview; build nothing
     python3 build_wall.py wall.json             # build every format in "formats"
@@ -16,10 +17,12 @@ wall.json:
   "cols": null,                                // null = derived
   "ink": null,                                 // mono colour override, "#RRGGBB"
   "brands": [
-    "brands/stripe.json",                      // a get_brand_data response saved verbatim
-    {"brand": "brands/slack.json", "accept": true},   // decision on a flag
-    {"brand": "brands/figma.json", "drop": true},
-    {"brand": "brands/shopify.json", "name": "Shopify"}
+    "brands.json",                             // a get_brands response saved verbatim:
+                                               //   every brand in it, in the order sent
+    {"brand": "brands.json#slack.com", "accept": true},   // decision on a flag
+    {"brand": "brands.json#figma.com", "drop": true},
+    {"brand": "brands.json#shopify.com", "name": "Shopify"},
+    "brands/stripe.com.json"                   // or a get_brand_data response, one brand
   ]
 }
 
@@ -149,6 +152,69 @@ def pick_color(cands, ground):
         f"to mono, accept, or drop")
 
 
+def load_response(path):
+    """A saved MCP response. Some hosts wrap the JSON as a string in
+    {"result": "..."}; unwrap it so a verbatim save always works."""
+    data = json.load(open(path))
+    while isinstance(data, dict) and set(data) == {"result"}:
+        data = data["result"]
+        if isinstance(data, str):
+            data = json.loads(data)
+    return data
+
+
+def brand_entries(cfg):
+    """wall.json "brands" as one entry per brand, in wall order.
+
+    An entry names a get_brand_data response ("brands/stripe.com.json"), a
+    get_brands batch response ("brands.json": every brand in it, in the
+    order sent), or one brand of a batch ("brands.json#stripe.com"), which
+    carries that brand's decision ("accept", "drop", "name") or replaces its
+    record with a full get_brand_data one ("full": "brands/stripe.com.json")."""
+    entries = [{"brand": e} if isinstance(e, str) else dict(e) for e in cfg["brands"]]
+    whole, picked = set(), {}
+    for e in entries:
+        path, _, ident = e["brand"].partition("#")
+        if ident:
+            picked[(path, ident.lower())] = e
+        elif "results" in load_response(path):
+            whole.add(path)
+    out = []
+    for e in entries:
+        path, _, ident = e["brand"].partition("#")
+        if ident:
+            if path not in whole:          # not expanded below: place it here
+                out.append(e)
+        elif path in whole:
+            for res in load_response(path)["results"]:
+                key = (path, str(res.get("identifier", "")).lower())
+                out.append(picked.get(key) or {"brand": f"{path}#{key[1]}"})
+        else:
+            out.append(e)
+    return out
+
+
+def load_brand(ref):
+    """(brand record or None, identifier asked for, why it is missing)."""
+    path, _, ident = ref.partition("#")
+    data = load_response(path)
+    if not ident:
+        return data, os.path.basename(path).removesuffix(".json").lower(), None
+    for res in data.get("results", []):
+        if str(res.get("identifier", "")).lower() == ident.lower():
+            if res.get("status") == 200 and res.get("brand"):
+                return res["brand"], ident.lower(), None
+            if res.get("code") == "crawl_queued":
+                why = ("not indexed yet: Brandfetch has queued it. Check the domain is "
+                       "right (a typo looks the same), then ask again later, or drop it")
+            else:
+                why = (f"not returned (status {res.get('status')}"
+                       f"{', ' + res['code'] if res.get('code') else ''}"
+                       f"{': ' + res['message'] if res.get('message') else ''}) — drop it")
+            return None, ident.lower(), why
+    sys.exit(f"{ref}: no result for {ident!r} in {path}")
+
+
 def resolve(cfg, workdir):
     ground = ground_hex(cfg.get("background", "dark"))
     kind = cfg.get("type", "logo")
@@ -159,14 +225,20 @@ def resolve(cfg, workdir):
         sys.exit(f'"type" must be "logo" or "symbol", not {kind!r}')
     inkc = (cfg.get("ink") or ("FFFFFF" if is_dark(ground) else "111111")).lstrip("#").upper()
     rows = []
-    for entry in cfg["brands"]:
-        entry = {"brand": entry} if isinstance(entry, str) else dict(entry)
-        brand = json.load(open(entry["brand"]))
-        api_name = (brand.get("name") or brand.get("domain") or entry["brand"]).strip()
+    for entry in brand_entries(cfg):
+        brand, asked, missing = load_brand(entry["brand"])
+        if entry.get("full"):
+            # the batch record omits logos of type "other", where a brand's
+            # official one-colour variant often lives: use the full record
+            brand, missing = load_response(entry["full"]), None
+        if missing:
+            rows.append({"name": entry.get("name") or asked, "entry": entry,
+                         "flags": [missing], "notes": []})
+            continue
+        api_name = (brand.get("name") or brand.get("domain") or asked).strip()
         name = entry.get("name") or api_name
         slug = re.sub(r"[^a-z0-9]+", "-", (brand.get("domain") or name).lower()).strip("-")
         row = {"name": name, "entry": entry, "flags": [], "notes": []}
-        asked = os.path.basename(entry["brand"]).removesuffix(".json").lower()
         got = (brand.get("domain") or "").lower()
         if got and "." in asked and asked != got:
             row["notes"].append(f"{asked} resolved to {got}: check it is the same company")
